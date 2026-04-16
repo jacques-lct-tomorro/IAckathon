@@ -1,11 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import {
-  buildDepartmentGroups,
-  getDepartmentBadgeClass,
-} from "../utils/org.js";
+import { buildDepartmentGroups } from "../utils/org.js";
 import { OrgNode } from "./OrgNode.jsx";
 import { OrgTooltip } from "./OrgTooltip.jsx";
-import { ProgressBar } from "./ProgressBar.jsx";
 import { TeamMembers } from "./TeamMembers.jsx";
 
 export function SimpleOrgChart({ records, highlightStatus }) {
@@ -48,20 +44,14 @@ export function SimpleOrgChart({ records, highlightStatus }) {
                       <div className="dept-block__header">
                         <div className="dept-label">{department.team}</div>
                         <div className="dept-progress">
-                          <ProgressBar
-                            value={department.ratio * 100}
-                            qualityClass={`progress-bar__fill--${getDepartmentBadgeClass(department.ratio)}`}
-                          />
+                          {Math.round(department.ratio * 100)}%
                         </div>
                       </div>
 
                       <div className="dept-block__tiers">
                         {department.admins.length ? (
                           <div className="dept-tier">
-                            <div
-                              className="dept-tier__bar"
-                              aria-hidden="true"
-                            />
+                            <div className="dept-tier__label">Admin</div>
                             <TeamMembers
                               members={department.admins}
                               highlightStatus={highlightStatus}
@@ -72,10 +62,7 @@ export function SimpleOrgChart({ records, highlightStatus }) {
 
                         {department.managers.length ? (
                           <div className="dept-tier">
-                            <div
-                              className="dept-tier__bar"
-                              aria-hidden="true"
-                            />
+                            <div className="dept-tier__label">Manager</div>
                             <TeamMembers
                               members={department.managers}
                               highlightStatus={highlightStatus}
@@ -86,10 +73,7 @@ export function SimpleOrgChart({ records, highlightStatus }) {
 
                         {department.users.length ? (
                           <div className="dept-tier">
-                            <div
-                              className="dept-tier__bar"
-                              aria-hidden="true"
-                            />
+                            <div className="dept-tier__label">User</div>
                             <TeamMembers
                               members={department.users}
                               highlightStatus={highlightStatus}
