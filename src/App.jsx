@@ -133,11 +133,19 @@ function isLeadershipCandidate(person) {
 }
 
 function isTeamAdmin(person) {
-  return String(person.accessRole || "").trim().toLowerCase() === "admin";
+  return (
+    String(person.accessRole || "")
+      .trim()
+      .toLowerCase() === "admin"
+  );
 }
 
 function isTeamManager(person) {
-  return String(person.accessRole || "").trim().toLowerCase() === "manager";
+  return (
+    String(person.accessRole || "")
+      .trim()
+      .toLowerCase() === "manager"
+  );
 }
 
 function buildDepartmentGroups(records) {
@@ -201,7 +209,9 @@ function buildDepartmentGroups(records) {
 
   const departments = [...teamMap.entries()]
     .map(([team, everyone]) => {
-      const admins = everyone.filter(isTeamAdmin).sort((left, right) => left.name.localeCompare(right.name));
+      const admins = everyone
+        .filter(isTeamAdmin)
+        .sort((left, right) => left.name.localeCompare(right.name));
       const managers = everyone
         .filter((person) => isTeamManager(person) && !isTeamAdmin(person))
         .sort((left, right) => left.name.localeCompare(right.name));
@@ -227,7 +237,9 @@ function buildDepartmentGroups(records) {
     .sort((left, right) => left.team.localeCompare(right.team));
 
   return {
-    leaders: leadersInTopBar.sort((left, right) => left.name.localeCompare(right.name)),
+    leaders: leadersInTopBar.sort((left, right) =>
+      left.name.localeCompare(right.name),
+    ),
     departments,
   };
 }
@@ -258,7 +270,9 @@ function OrgNode({ person, highlightStatus, onSelect }) {
         <span className="mini-node__status-dot" />
       </div>
       <div className={nameClass}>{person.name}</div>
-      <div className="mini-node__role">{person.role || person.team || "User"}</div>
+      <div className="mini-node__role">
+        {person.role || person.team || "User"}
+      </div>
     </div>
   );
 }
@@ -297,7 +311,9 @@ function OrgTooltip({ person }) {
     <aside className="org-tooltip">
       <div className="org-tooltip__header">
         <div>
-          <div className={`org-tooltip__name${nameAccentClass}`.trim()}>{person.name}</div>
+          <div className={`org-tooltip__name${nameAccentClass}`.trim()}>
+            {person.name}
+          </div>
           <div className="org-tooltip__role">{person.role || "No role"}</div>
         </div>
       </div>
@@ -305,7 +321,8 @@ function OrgTooltip({ person }) {
         Team: <span>{person.team || "No team"}</span>
       </div>
       <div className="org-tooltip__row">
-        Status: <span>{STATUS_CONFIG[person.status]?.label || person.status}</span>
+        Status:{" "}
+        <span>{STATUS_CONFIG[person.status]?.label || person.status}</span>
       </div>
       <div className="org-tooltip__row">
         Last connected: <span>{person.lastConnectedAt || "—"}</span>
@@ -405,7 +422,10 @@ function SimpleOrgChart({ records, highlightStatus }) {
                       <div className="dept-block__tiers">
                         {department.admins.length ? (
                           <div className="dept-tier">
-                            <div className="dept-tier__bar" aria-hidden="true" />
+                            <div
+                              className="dept-tier__bar"
+                              aria-hidden="true"
+                            />
                             <TeamMembers
                               members={department.admins}
                               highlightStatus={highlightStatus}
@@ -416,7 +436,10 @@ function SimpleOrgChart({ records, highlightStatus }) {
 
                         {department.managers.length ? (
                           <div className="dept-tier">
-                            <div className="dept-tier__bar" aria-hidden="true" />
+                            <div
+                              className="dept-tier__bar"
+                              aria-hidden="true"
+                            />
                             <TeamMembers
                               members={department.managers}
                               highlightStatus={highlightStatus}
@@ -427,7 +450,10 @@ function SimpleOrgChart({ records, highlightStatus }) {
 
                         {department.users.length ? (
                           <div className="dept-tier">
-                            <div className="dept-tier__bar" aria-hidden="true" />
+                            <div
+                              className="dept-tier__bar"
+                              aria-hidden="true"
+                            />
                             <TeamMembers
                               members={department.users}
                               highlightStatus={highlightStatus}
@@ -1024,9 +1050,7 @@ function TeamHealthPanel({
   const expectedTeamCount = structure.departments.length;
   const receivedCount = teams?.length ?? 0;
   const skeletonSlots =
-    isLoading && hasTeams
-      ? Math.max(0, expectedTeamCount - receivedCount)
-      : 0;
+    isLoading && hasTeams ? Math.max(0, expectedTeamCount - receivedCount) : 0;
   const showTeamGrid =
     !error && hasTeams && (isLoading || (teams?.length ?? 0) > 0);
 
@@ -1241,9 +1265,9 @@ function CompanyCoverage({ records }) {
           </span>
         </p>
         <p className="coverage-copy">
-          Coverage is the share of teammates who are Active or Inactive. Whitespace
-          (invited, not yet on board) counts toward the total but not toward covered
-          until they connect.
+          Coverage is the share of teammates who are Active or Inactive.
+          Whitespace (invited, not yet on board) counts toward the total but not
+          toward covered until they connect.
         </p>
       </div>
       <div className="coverage-grid">
@@ -1328,9 +1352,9 @@ function LoginForm({ onSuccess }) {
         <aside className="auth-brand" aria-hidden="true">
           <div className="auth-brand__mark">
             <span className="auth-brand__orbit" />
-            <span className="auth-brand__core">CW</span>
+            <span className="auth-brand__core">OS</span>
           </div>
-          <p className="auth-brand__title">Coverage intelligence</p>
+          <p className="auth-brand__title">OroScope</p>
           <p className="auth-brand__tagline">
             Map org adoption, spot team risk, and generate Claude-backed signals
             from your CSV data.
@@ -1623,7 +1647,7 @@ export default function App() {
     <main className="app-shell">
       <section className="hero">
         <div>
-          <h1>Client Whitespaces Mapping</h1>
+          <h1>OroScope</h1>
           <p className="hero-copy">
             Select a company, inspect the org chart, and highlight users by
             activation status from a CSV source you can update later.
