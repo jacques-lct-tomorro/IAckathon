@@ -1590,9 +1590,9 @@ input {
 }
 
 .mini-node__avatar.invite {
-  background: #e8f0ff;
-  color: #1e4578;
-  border-color: #7eb3ff;
+  background: #fde8e8;
+  color: #7a1e1e;
+  border-color: #ef9a9a;
 }
 
 .mini-node__avatar.irrelevant {
@@ -1621,7 +1621,7 @@ input {
 }
 
 .mini-node__avatar.invite .mini-node__status-dot {
-  background: #4285f4;
+  background: #d32f2f;
 }
 
 .mini-node__avatar.irrelevant .mini-node__status-dot {

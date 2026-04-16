@@ -1,6 +1,7 @@
 import {
   STATUS_CLASS,
   STATUS_ORDER,
+  STATUS_SORT_ORDER,
   TEAM_DISPLAY_LABELS,
 } from "../constants.js";
 
@@ -117,6 +118,13 @@ export function isTeamManager(person) {
   );
 }
 
+function compareByStatusThenName(left, right) {
+  const statusDiff =
+    (STATUS_SORT_ORDER[left.status] ?? 99) -
+    (STATUS_SORT_ORDER[right.status] ?? 99);
+  return statusDiff !== 0 ? statusDiff : left.name.localeCompare(right.name);
+}
+
 export function buildDepartmentGroups(records) {
   const managerNames = new Set(records.map((person) => person.name));
   const hasManagerData = records.some(
@@ -180,13 +188,13 @@ export function buildDepartmentGroups(records) {
     .map(([team, everyone]) => {
       const admins = everyone
         .filter(isTeamAdmin)
-        .sort((left, right) => left.name.localeCompare(right.name));
+        .sort(compareByStatusThenName);
       const managers = everyone
         .filter((person) => isTeamManager(person) && !isTeamAdmin(person))
-        .sort((left, right) => left.name.localeCompare(right.name));
+        .sort(compareByStatusThenName);
       const users = everyone
         .filter((person) => !isTeamAdmin(person) && !isTeamManager(person))
-        .sort((left, right) => left.name.localeCompare(right.name));
+        .sort(compareByStatusThenName);
       const relevantMembers = everyone;
       const coveredMembers = relevantMembers.filter(
         (person) => person.status === "Active" || person.status === "Inactive",
@@ -206,9 +214,7 @@ export function buildDepartmentGroups(records) {
     .sort((left, right) => left.team.localeCompare(right.team));
 
   return {
-    leaders: leadersInTopBar.sort((left, right) =>
-      left.name.localeCompare(right.name),
-    ),
+    leaders: leadersInTopBar.sort(compareByStatusThenName),
     departments,
   };
 }

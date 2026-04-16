@@ -15,10 +15,12 @@ export const STATUS_CONFIG = {
   },
   "To Invite": {
     label: "Whitespace",
-    color: "#2d6df6",
-    badge: "Blue",
+    color: "#d32f2f",
+    badge: "Red",
   },
 };
+
+export const STATUS_SORT_ORDER = { Active: 0, Inactive: 1, "To Invite": 2 };
 
 export const STATUS_ORDER = ["Active", "Inactive", "To Invite"];
 
