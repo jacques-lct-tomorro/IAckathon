@@ -1,4 +1,4 @@
-Last Connected At,Dim User - User → Email,Dim User - User → Full Name,Dim User - User → Role,Dim User - User → Organization Name,Dim User - User → Team,Dim User - User → Job Title
+Last connected at,Email,Full name,Access role,Organization,Team,Job title
 ,clement.coutelet@verkor.com,Clement Coutelet,user,Verkor,,
 ,olivier.bonniere@raja.fr,Olivier Bonniere,user,Raja,,
 ,badreddine.lehalali@verkor.com,Badreddine Lehalali,user,Verkor,,

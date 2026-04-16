@@ -3,5 +3,9 @@
   "finance": "Finance",
   "general_management": "Manager",
   "hr": "HR",
-  "operations": "Operations"
+  "operations": "Operations",
+  "customer_relationship": "Customer Relationship",
+  "it": "IT",
+  "sales": "Sales",
+  "legal": "Legal"
 }

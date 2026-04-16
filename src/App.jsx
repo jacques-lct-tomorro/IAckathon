@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import defaultCsv from "./data/default-org-data.csv?raw";
 import teamDisplayLabels from "./data/team-display-labels.json";
 
@@ -142,6 +142,14 @@ function isLeadershipCandidate(person) {
   );
 }
 
+function isTeamAdmin(person) {
+  return String(person.accessRole || "").trim().toLowerCase() === "admin";
+}
+
+function isTeamManager(person) {
+  return String(person.accessRole || "").trim().toLowerCase() === "manager";
+}
+
 function buildDepartmentGroups(records) {
   const managerNames = new Set(records.map((person) => person.name));
   const hasManagerData = records.some(
@@ -175,11 +183,21 @@ function buildDepartmentGroups(records) {
     leaders = inferredLeaders.length ? inferredLeaders : records.slice(0, 1);
   }
 
-  const leaderIds = new Set(leaders.map((person) => person.id));
+  const leadersInTopBar = leaders.filter((person) => {
+    const hasTeam = Boolean(String(person.team || "").trim());
+
+    if (hasTeam && (isTeamAdmin(person) || isTeamManager(person))) {
+      return false;
+    }
+
+    return true;
+  });
+
+  const topBarLeaderIds = new Set(leadersInTopBar.map((person) => person.id));
   const teamMap = new Map();
 
   records
-    .filter((person) => !leaderIds.has(person.id))
+    .filter((person) => !topBarLeaderIds.has(person.id))
     .forEach((person) => {
       const teamName = person.team || "No team";
 
@@ -191,10 +209,15 @@ function buildDepartmentGroups(records) {
     });
 
   const departments = [...teamMap.entries()]
-    .map(([team, members]) => {
-      const relevantMembers = members.filter(
-        (person) => person.status !== "Not Relevant",
-      );
+    .map(([team, everyone]) => {
+      const admins = everyone.filter(isTeamAdmin).sort((left, right) => left.name.localeCompare(right.name));
+      const managers = everyone
+        .filter((person) => isTeamManager(person) && !isTeamAdmin(person))
+        .sort((left, right) => left.name.localeCompare(right.name));
+      const users = everyone
+        .filter((person) => !isTeamAdmin(person) && !isTeamManager(person))
+        .sort((left, right) => left.name.localeCompare(right.name));
+      const relevantMembers = everyone.filter((person) => person.status !== "Not Relevant");
       const coveredMembers = relevantMembers.filter(
         (person) => person.status === "Active" || person.status === "Inactive",
       );
@@ -204,16 +227,16 @@ function buildDepartmentGroups(records) {
 
       return {
         team,
-        members: members.sort((left, right) =>
-          left.name.localeCompare(right.name),
-        ),
+        admins,
+        managers,
+        users,
         ratio,
       };
     })
     .sort((left, right) => left.team.localeCompare(right.team));
 
   return {
-    leaders: leaders.sort((left, right) => left.name.localeCompare(right.name)),
+    leaders: leadersInTopBar.sort((left, right) => left.name.localeCompare(right.name)),
     departments,
   };
 }
@@ -223,6 +246,12 @@ function OrgNode({ person, highlightStatus, onSelect }) {
     highlightStatus && person.status !== highlightStatus,
   );
   const statusClass = getStatusClass(person.status);
+  const nameExtra = isTeamAdmin(person)
+    ? "mini-node__name--admin"
+    : isTeamManager(person)
+      ? "mini-node__name--manager"
+      : "";
+  const nameClass = ["mini-node__name", nameExtra].filter(Boolean).join(" ");
 
   return (
     <div
@@ -237,12 +266,23 @@ function OrgNode({ person, highlightStatus, onSelect }) {
         ) : null}
         <span className="mini-node__status-dot" />
       </div>
-      <div className="mini-node__name">{person.name}</div>
-      <div className="mini-node__role">
-        {person.role || person.team || "User"}
-      </div>
+      <div className={nameClass}>{person.name}</div>
+      <div className="mini-node__role">{person.role || person.team || "User"}</div>
     </div>
   );
+}
+
+function formatAccessRoleForTooltip(person) {
+  if (isTeamAdmin(person)) {
+    return "Admin";
+  }
+
+  if (isTeamManager(person)) {
+    return "Manager";
+  }
+
+  const raw = String(person.accessRole || "").trim();
+  return raw || null;
 }
 
 function OrgTooltip({ person }) {
@@ -250,11 +290,23 @@ function OrgTooltip({ person }) {
     return null;
   }
 
+  const accessLabel = formatAccessRoleForTooltip(person);
+  const nameAccentClass = isTeamAdmin(person)
+    ? " org-tooltip__accent--admin"
+    : isTeamManager(person)
+      ? " org-tooltip__accent"
+      : "";
+  const accessAccentClass = isTeamAdmin(person)
+    ? "org-tooltip__accent--admin"
+    : isTeamManager(person)
+      ? "org-tooltip__accent"
+      : "";
+
   return (
     <aside className="org-tooltip">
       <div className="org-tooltip__header">
         <div>
-          <div className="org-tooltip__name">{person.name}</div>
+          <div className={`org-tooltip__name${nameAccentClass}`.trim()}>{person.name}</div>
           <div className="org-tooltip__role">{person.role || "No role"}</div>
         </div>
       </div>
@@ -315,64 +367,8 @@ function TeamMembers({ members, highlightStatus, onSelect }) {
   );
 }
 
-function HorizontalScrollSlider({ containerRef, dependencyKey }) {
-  const [maxScroll, setMaxScroll] = useState(0);
-  const [scrollLeft, setScrollLeft] = useState(0);
-
-  useEffect(() => {
-    const element = containerRef.current;
-
-    if (!element) {
-      return undefined;
-    }
-
-    const sync = () => {
-      const nextMax = Math.max(0, element.scrollWidth - element.clientWidth);
-      setMaxScroll(nextMax);
-      setScrollLeft(Math.min(element.scrollLeft, nextMax));
-    };
-
-    sync();
-    element.addEventListener("scroll", sync);
-    window.addEventListener("resize", sync);
-
-    return () => {
-      element.removeEventListener("scroll", sync);
-      window.removeEventListener("resize", sync);
-    };
-  }, [containerRef, dependencyKey]);
-
-  if (maxScroll <= 0) {
-    return null;
-  }
-
-  return (
-    <div className="org-chart-slider">
-      <span className="org-chart-slider__label">Scroll</span>
-      <input
-        className="org-chart-slider__input"
-        type="range"
-        min={0}
-        max={maxScroll}
-        value={scrollLeft}
-        onChange={(event) => {
-          const element = containerRef.current;
-          const nextValue = Number(event.target.value);
-
-          setScrollLeft(nextValue);
-
-          if (element) {
-            element.scrollLeft = nextValue;
-          }
-        }}
-      />
-    </div>
-  );
-}
-
 function SimpleOrgChart({ records, highlightStatus }) {
   const [selectedPerson, setSelectedPerson] = useState(null);
-  const scrollRef = useRef(null);
   const structure = useMemo(() => buildDepartmentGroups(records), [records]);
 
   useEffect(() => {
@@ -385,54 +381,81 @@ function SimpleOrgChart({ records, highlightStatus }) {
 
   return (
     <>
-      <div ref={scrollRef} className="simple-org-scroll">
-        <div className="simple-org">
-          <div className="simple-org__level simple-org__level--leaders">
-            {structure.leaders.map((person) => (
-              <OrgNode
-                key={person.id}
-                person={person}
-                highlightStatus={highlightStatus}
-                onSelect={setSelectedPerson}
-              />
-            ))}
-          </div>
+      <div className="simple-org">
+        <div className="simple-org__level simple-org__level--leaders">
+          {structure.leaders.map((person) => (
+            <OrgNode
+              key={person.id}
+              person={person}
+              highlightStatus={highlightStatus}
+              onSelect={setSelectedPerson}
+            />
+          ))}
+        </div>
 
-          {structure.departments.length ? (
-            <>
-              <div className="simple-org__connector">
-                <div className="simple-org__vline" />
-              </div>
+        {structure.departments.length ? (
+          <>
+            <div className="simple-org__connector">
+              <div className="simple-org__vline" />
+            </div>
 
+            <div className="simple-org__departments-strip">
               <div className="simple-org__departments">
                 {structure.departments.map((department) => (
-                  <section key={department.team} className="dept-block">
-                    <div className="dept-block__header">
-                      <div className="dept-label">{department.team}</div>
-                      <div className="dept-progress">
-                        <ProgressBar
-                          value={department.ratio * 100}
-                          qualityClass={`progress-bar__fill--${getDepartmentBadgeClass(department.ratio)}`}
-                        />
+                  <div key={department.team} className="dept-column">
+                    <section className="dept-block">
+                      <div className="dept-block__header">
+                        <div className="dept-label">{department.team}</div>
+                        <div className="dept-progress">
+                          <ProgressBar
+                            value={department.ratio * 100}
+                            qualityClass={`progress-bar__fill--${getDepartmentBadgeClass(department.ratio)}`}
+                          />
+                        </div>
                       </div>
-                    </div>
 
-                    <TeamMembers
-                      members={department.members}
-                      highlightStatus={highlightStatus}
-                      onSelect={setSelectedPerson}
-                    />
-                  </section>
+                      <div className="dept-block__tiers">
+                        {department.admins.length ? (
+                          <div className="dept-tier">
+                            <div className="dept-tier__bar" aria-hidden="true" />
+                            <TeamMembers
+                              members={department.admins}
+                              highlightStatus={highlightStatus}
+                              onSelect={setSelectedPerson}
+                            />
+                          </div>
+                        ) : null}
+
+                        {department.managers.length ? (
+                          <div className="dept-tier">
+                            <div className="dept-tier__bar" aria-hidden="true" />
+                            <TeamMembers
+                              members={department.managers}
+                              highlightStatus={highlightStatus}
+                              onSelect={setSelectedPerson}
+                            />
+                          </div>
+                        ) : null}
+
+                        {department.users.length ? (
+                          <div className="dept-tier">
+                            <div className="dept-tier__bar" aria-hidden="true" />
+                            <TeamMembers
+                              members={department.users}
+                              highlightStatus={highlightStatus}
+                              onSelect={setSelectedPerson}
+                            />
+                          </div>
+                        ) : null}
+                      </div>
+                    </section>
+                  </div>
                 ))}
               </div>
-            </>
-          ) : null}
-        </div>
+            </div>
+          </>
+        ) : null}
       </div>
-      <HorizontalScrollSlider
-        containerRef={scrollRef}
-        dependencyKey={`${records.length}-${highlightStatus || "all"}-${structure.departments.length}`}
-      />
 
       <OrgTooltip person={selectedPerson} />
     </>
@@ -543,7 +566,13 @@ function deriveStatus(rawRecord, lastConnectedAt) {
     return normalizeStatus(explicitStatus);
   }
 
-  const role = String(rawRecord.dim_user_user_role || rawRecord.role || "")
+  const role = String(
+    rawRecord.dim_user_user_role ||
+      rawRecord.access_role ||
+      rawRecord.user_role ||
+      rawRecord.role ||
+      "",
+  )
     .trim()
     .toLowerCase();
 
@@ -613,10 +642,12 @@ function parseCsv(text) {
     const company =
       rawRecord.dim_user_user_organization_name ||
       rawRecord.organization_name ||
+      rawRecord.organization ||
       rawRecord.company ||
       "Unknown Company";
     const accessRole =
       rawRecord.dim_user_user_role ||
+      rawRecord.access_role ||
       rawRecord.user_role ||
       rawRecord.role ||
       "";
@@ -752,7 +783,11 @@ function buildTeamMetricsPayload(company, records) {
   const structure = buildDepartmentGroups(records);
 
   return structure.departments.map((department) => {
-    const members = department.members;
+    const members = [
+      ...(department.admins || []),
+      ...(department.managers || []),
+      ...(department.users || []),
+    ];
     const counts = collectStatusCounts(members);
     const relevantMembers = members.filter(
       (person) => person.status !== "Not Relevant",
@@ -1015,12 +1050,7 @@ function TeamHealthPanel({
     <section className="team-flags">
       <div className="team-flags__header">
         <div>
-          <p className="eyebrow">Team signals</p>
-          <h2>Green and red flags by team</h2>
-          <p className="team-flags__lede">
-            Claude reads the same adoption metrics as the org chart and returns
-            actionable signals per department.
-          </p>
+          <h2>Team signals</h2>
         </div>
         <button
           type="button"
@@ -1189,10 +1219,6 @@ function PersonCard({ person, highlightStatus }) {
         <div>
           <dt>Status</dt>
           <dd>{STATUS_CONFIG[person.status].label}</dd>
-        </div>
-        <div>
-          <dt>Manager</dt>
-          <dd>{person.managerName || "Top level"}</dd>
         </div>
         <div>
           <dt>Connections last month</dt>
