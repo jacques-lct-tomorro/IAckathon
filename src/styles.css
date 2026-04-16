@@ -1471,16 +1471,6 @@ input {
   color: var(--text-primary);
 }
 
-.mini-node__name--admin {
-  color: #1565c0;
-  font-weight: 700;
-}
-
-.mini-node__name--manager {
-  color: #1b5e20;
-  font-weight: 700;
-}
-
 .mini-node__role {
   max-width: 76px;
   font-size: 9px;
@@ -1527,16 +1517,6 @@ input {
 .org-tooltip__row span {
   color: var(--text-primary);
   font-weight: 500;
-}
-
-.org-tooltip__accent {
-  color: #1b5e20;
-  font-weight: 600;
-}
-
-.org-tooltip__accent--admin {
-  color: #1565c0;
-  font-weight: 600;
 }
 
 .empty-state,

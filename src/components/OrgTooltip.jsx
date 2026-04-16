@@ -1,24 +1,15 @@
 import { STATUS_CONFIG } from "../constants.js";
-import { isTeamAdmin, isTeamManager } from "../utils/org.js";
 
 export function OrgTooltip({ person }) {
   if (!person) {
     return null;
   }
 
-  const nameAccentClass = isTeamAdmin(person)
-    ? " org-tooltip__accent--admin"
-    : isTeamManager(person)
-      ? " org-tooltip__accent"
-      : "";
-
   return (
     <aside className="org-tooltip">
       <div className="org-tooltip__header">
         <div>
-          <div className={`org-tooltip__name${nameAccentClass}`.trim()}>
-            {person.name}
-          </div>
+          <div className="org-tooltip__name">{person.name}</div>
           <div className="org-tooltip__role">{person.role || "No role"}</div>
         </div>
       </div>

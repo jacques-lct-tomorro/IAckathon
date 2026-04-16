@@ -1,20 +1,10 @@
-import {
-  getStatusClass,
-  isTeamAdmin,
-  isTeamManager,
-} from "../utils/org.js";
+import { getStatusClass } from "../utils/org.js";
 
 export function OrgNode({ person, highlightStatus, onSelect }) {
   const isBlurred = Boolean(
     highlightStatus && person.status !== highlightStatus,
   );
   const statusClass = getStatusClass(person.status);
-  const nameExtra = isTeamAdmin(person)
-    ? "mini-node__name--admin"
-    : isTeamManager(person)
-      ? "mini-node__name--manager"
-      : "";
-  const nameClass = ["mini-node__name", nameExtra].filter(Boolean).join(" ");
 
   return (
     <div
@@ -29,7 +19,7 @@ export function OrgNode({ person, highlightStatus, onSelect }) {
         ) : null}
         <span className="mini-node__status-dot" />
       </div>
-      <div className={nameClass}>{person.name}</div>
+      <div className="mini-node__name">{person.name}</div>
       <div className="mini-node__role">
         {person.role || person.team || "User"}
       </div>

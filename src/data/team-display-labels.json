@@ -8,5 +8,6 @@
   "it": "IT",
   "sales": "Sales",
   "legal": "Legal",
-  "procurement": "Procurement"
+  "procurement": "Procurement",
+  "other":"No team"
 }
