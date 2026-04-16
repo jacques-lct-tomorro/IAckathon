@@ -919,8 +919,7 @@ export default function App() {
     <main className="app-shell">
       <section className="hero">
         <div>
-          <p className="eyebrow">React Org Chart</p>
-          <h1>Company Adoption Coverage</h1>
+          <h1>Client Whitespaces Mapping</h1>
           <p className="hero-copy">
             Select a company, inspect the org chart, and highlight users by activation status from a CSV source you can update later.
           </p>
