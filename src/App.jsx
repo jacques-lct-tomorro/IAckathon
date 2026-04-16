@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import defaultCsv from "./data/default-org-data.csv?raw";
 import teamDisplayLabels from "./data/team-display-labels.json";
 
+const API_BASE = import.meta.env.VITE_API_BASE_URL || "";
+
 const STATUS_CONFIG = {
   Active: {
     label: "Active user",
@@ -806,7 +808,7 @@ async function generateTeamFlags(company, records, signal, onUnauthorized) {
   }
 
   const teams = buildTeamMetricsPayload(company, records);
-  const response = await fetch("/api/team-flags", {
+  const response = await fetch(`${API_BASE}/api/team-flags`, {
     method: "POST",
     signal,
     credentials: "include",
@@ -1117,7 +1119,7 @@ function LoginForm({ onSuccess }) {
     setSubmitting(true);
 
     try {
-      const response = await fetch("/api/auth/login", {
+      const response = await fetch(`${API_BASE}/api/auth/login`, {
         method: "POST",
         credentials: "include",
         headers: { "content-type": "application/json" },
@@ -1293,7 +1295,7 @@ export default function App() {
 
     async function checkSession() {
       try {
-        const response = await fetch("/api/auth/me", {
+        const response = await fetch(`${API_BASE}/api/auth/me`, {
           credentials: "include",
         });
         if (cancelled) {
@@ -1326,7 +1328,7 @@ export default function App() {
 
   const handleLogout = async () => {
     try {
-      await fetch("/api/auth/logout", {
+      await fetch(`${API_BASE}/api/auth/logout`, {
         method: "POST",
         credentials: "include",
       });
