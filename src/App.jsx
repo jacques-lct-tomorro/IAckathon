@@ -118,20 +118,16 @@ function isLeadershipCandidate(person) {
   const title = String(person.role || "")
     .trim()
     .toLowerCase();
-  const accessRole = String(person.accessRole || "")
-    .trim()
-    .toLowerCase();
   const team = normalizeTeamSlug(person.team);
 
   if (team === "general_management" || team === "executive") {
     return true;
   }
 
-  if (accessRole === "admin" || accessRole === "manager") {
-    return true;
-  }
+  // Do not treat Spendesk-style access_role "manager"/"admin" alone as org-chart
+  // leadership — it misclassifies platform managers with no job title as top-bar leaders.
 
-  return /(ceo|chief|founder|co-founder|president|vp|head|director|lead|manager|general counsel|cfo|coo|cto)/i.test(
+  return /(ceo|chief|founder|co-founder|president|vp|head|director|directeur|directrice|lead|manager|general counsel|cfo|coo|cto|dsi)/i.test(
     title,
   );
 }
@@ -158,9 +154,10 @@ function buildDepartmentGroups(records) {
   if (hasManagerData) {
     leaders = records.filter(
       (person) =>
-        !person.managerName ||
-        !managerNames.has(person.managerName) ||
-        person.managerName === person.name,
+        (!person.managerName ||
+          !managerNames.has(person.managerName) ||
+          person.managerName === person.name) &&
+        isLeadershipCandidate(person),
     );
   } else {
     const execTeamLeaders = records.filter(
