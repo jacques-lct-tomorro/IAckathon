@@ -1639,7 +1639,7 @@ export default function App() {
     runTeamFlags();
 
     return () => controller.abort();
-  }, [teamFlagsNonce, selectedCompany, companyRecords]);
+  }, [teamFlagsNonce]);
 
   if (authLoading) {
     return (
