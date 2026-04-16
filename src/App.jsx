@@ -209,8 +209,11 @@ function SimpleOrgChart({ records, highlightStatus }) {
                 <section key={department.team} className="dept-block">
                   <div className="dept-block__header">
                     <div className="dept-label">{department.team}</div>
-                    <div className={`dept-badge ${getDepartmentBadgeClass(department.ratio)}`}>
-                      {Math.round(department.ratio * 100)}%
+                    <div className="dept-progress">
+                      <ProgressBar
+                        value={department.ratio * 100}
+                        qualityClass={`progress-bar__fill--${getDepartmentBadgeClass(department.ratio)}`}
+                      />
                     </div>
                   </div>
 
@@ -384,111 +387,25 @@ function computeCoverage(records) {
   };
 }
 
-function renderInlineMarkdown(text) {
-  const parts = String(text || "").split(/(`[^`]+`|\*\*[^*]+\*\*|\*[^*]+\*)/g);
+function ProgressBar({ value, max = 100, qualityClass = "" }) {
+  const pct = max <= 0 ? 0 : Math.min(100, Math.max(0, (value / max) * 100));
+  const rounded = Math.round(pct);
 
-  return parts.filter(Boolean).map((part, index) => {
-    if (part.startsWith("**") && part.endsWith("**")) {
-      return <strong key={`${part}-${index}`}>{part.slice(2, -2)}</strong>;
-    }
-
-    if (part.startsWith("*") && part.endsWith("*")) {
-      return <em key={`${part}-${index}`}>{part.slice(1, -1)}</em>;
-    }
-
-    if (part.startsWith("`") && part.endsWith("`")) {
-      return <code key={`${part}-${index}`}>{part.slice(1, -1)}</code>;
-    }
-
-    return <span key={`${part}-${index}`}>{part}</span>;
-  });
-}
-
-function MarkdownBlock({ content }) {
-  const lines = String(content || "").split("\n");
-  const blocks = [];
-  let bulletItems = [];
-  let numberedItems = [];
-
-  const flushBullets = () => {
-    if (bulletItems.length) {
-      blocks.push(
-        <ul key={`bullets-${blocks.length}`} className="markdown-list">
-          {bulletItems.map((item, index) => (
-            <li key={`${item}-${index}`}>{renderInlineMarkdown(item)}</li>
-          ))}
-        </ul>,
-      );
-      bulletItems = [];
-    }
-  };
-
-  const flushNumbered = () => {
-    if (numberedItems.length) {
-      blocks.push(
-        <ol key={`numbers-${blocks.length}`} className="markdown-list">
-          {numberedItems.map((item, index) => (
-            <li key={`${item}-${index}`}>{renderInlineMarkdown(item)}</li>
-          ))}
-        </ol>,
-      );
-      numberedItems = [];
-    }
-  };
-
-  lines.forEach((line) => {
-    const trimmed = line.trim();
-
-    if (!trimmed) {
-      flushBullets();
-      flushNumbered();
-      return;
-    }
-
-    if (trimmed.startsWith("### ")) {
-      flushBullets();
-      flushNumbered();
-      blocks.push(<h4 key={`h4-${blocks.length}`}>{renderInlineMarkdown(trimmed.slice(4))}</h4>);
-      return;
-    }
-
-    if (trimmed.startsWith("## ")) {
-      flushBullets();
-      flushNumbered();
-      blocks.push(<h3 key={`h3-${blocks.length}`}>{renderInlineMarkdown(trimmed.slice(3))}</h3>);
-      return;
-    }
-
-    if (trimmed.startsWith("# ")) {
-      flushBullets();
-      flushNumbered();
-      blocks.push(<h2 key={`h2-${blocks.length}`}>{renderInlineMarkdown(trimmed.slice(2))}</h2>);
-      return;
-    }
-
-    if (/^[-*]\s+/.test(trimmed)) {
-      flushNumbered();
-      bulletItems.push(trimmed.replace(/^[-*]\s+/, ""));
-      return;
-    }
-
-    if (/^\d+\.\s+/.test(trimmed)) {
-      flushBullets();
-      numberedItems.push(trimmed.replace(/^\d+\.\s+/, ""));
-      return;
-    }
-
-    flushBullets();
-    flushNumbered();
-    blocks.push(
-      <p key={`p-${blocks.length}`}>{renderInlineMarkdown(trimmed)}</p>,
-    );
-  });
-
-  flushBullets();
-  flushNumbered();
-
-  return <div className="summary-content">{blocks}</div>;
+  return (
+    <div
+      className="progress-bar"
+      role="progressbar"
+      aria-valuenow={rounded}
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-label={`${rounded} percent`}
+    >
+      <div
+        className={["progress-bar__fill", qualityClass].filter(Boolean).join(" ")}
+        style={{ width: `${pct}%` }}
+      />
+    </div>
+  );
 }
 
 function buildTeamMetricsPayload(company, records) {
@@ -791,152 +708,6 @@ function TeamHealthPanel({
   );
 }
 
-function buildSummaryPrompt(company, records) {
-  const coverage = computeCoverage(records);
-  const counts = collectStatusCounts(records);
-  const teamBreakdown = [...new Set(records.map((person) => person.team).filter(Boolean))]
-    .sort((left, right) => left.localeCompare(right))
-    .map((team) => {
-      const teamRecords = records.filter((person) => person.team === team);
-      const activeCount = teamRecords.filter((person) => person.status === "Active").length;
-      const inactiveCount = teamRecords.filter((person) => person.status === "Inactive").length;
-      const inviteCount = teamRecords.filter((person) => person.status === "To Invite").length;
-      const avgConnections = teamRecords.length
-        ? (
-            teamRecords.reduce(
-              (sum, person) => sum + person.connectionsLastMonth,
-              0,
-            ) / teamRecords.length
-          ).toFixed(1)
-        : "0.0";
-
-      return `- ${team}: ${teamRecords.length} users, ${activeCount} active, ${inactiveCount} inactive, ${inviteCount} to invite, average ${avgConnections} connections last month`;
-    })
-    .join("\n");
-
-  const lowEngagementUsers = [...records]
-    .filter((person) => person.status !== "Not Relevant")
-    .sort((left, right) => left.connectionsLastMonth - right.connectionsLastMonth)
-    .slice(0, 5)
-    .map(
-      (person) =>
-        `- ${person.name} | ${person.role || "No role"} | ${person.team || "No team"} | ${person.status} | ${person.connectionsLastMonth} connections`,
-    )
-    .join("\n");
-
-  return `
-You are an enterprise adoption strategist.
-Analyze company adoption data and recommend the most important actions to convert more people into active users.
-
-Company: ${company}
-Coverage: ${coverage.ratio.toFixed(0)}%
-Covered users: ${coverage.coveredUsers}
-Relevant users: ${coverage.relevantUsers}
-Status counts:
-- Active: ${counts.Active}
-- Inactive: ${counts.Inactive}
-- To Invite: ${counts["To Invite"]}
-- Not Relevant: ${counts["Not Relevant"]}
-
-Team breakdown:
-${teamBreakdown || "- No teams available"}
-
-Lowest-engagement relevant users:
-${lowEngagementUsers || "- No users available"}
-
-Return markdown with exactly:
-# Executive Summary
-One sentence.
-
-## Recommended Actions
-- Three short action bullets prioritized by impact
-
-## Focus Team
-One short line naming the team with the best short-term activation potential.
-
-Keep the answer under 120 words, concrete, and business-oriented.
-`.trim();
-}
-
-async function generateCompanySummary(company, records, signal) {
-  const response = await fetch("/api/anthropic/v1/messages", {
-    method: "POST",
-    signal,
-    headers: {
-      "content-type": "application/json",
-      "x-api-key": ANTHROPIC_API_KEY,
-      "anthropic-version": "2023-06-01",
-      "anthropic-dangerous-direct-browser-access": "true",
-    },
-    body: JSON.stringify({
-      model: ANTHROPIC_MODEL,
-      max_tokens: 220,
-      temperature: 0.3,
-      messages: [
-        {
-          role: "user",
-          content: buildSummaryPrompt(company, records),
-        },
-      ],
-    }),
-  });
-
-  if (!response.ok) {
-    const errorPayload = await response.json().catch(() => null);
-    const apiMessage = errorPayload?.error?.message || `Anthropic API error ${response.status}`;
-    throw new Error(apiMessage);
-  }
-
-  const payload = await response.json();
-  return payload.content?.map((item) => item.text).join("\n").trim() || "No summary returned.";
-}
-
-function AiSummaryPanel({
-  company,
-  summary,
-  isLoading,
-  error,
-  onRefresh,
-}) {
-  return (
-    <section className="ai-summary">
-      <div className="ai-summary__header">
-        <div>
-          <p className="eyebrow">AI Summary</p>
-          <h2>Recommended actions for {company}</h2>
-        </div>
-      {ANTHROPIC_API_KEY ? (
-          <button type="button" className="action-button" onClick={onRefresh} disabled={isLoading}>
-            {isLoading ? "Generating..." : summary ? "Refresh summary" : "Generate summary"}
-          </button>
-        ) : null}
-      </div>
-
-      {!ANTHROPIC_API_KEY ? (
-        <p className="summary-placeholder">
-          Add `VITE_ANTHROPIC_API_KEY=your_key_here` to `.env`, then restart `npm run dev`.
-        </p>
-      ) : null}
-
-      {ANTHROPIC_API_KEY && isLoading ? (
-        <p className="summary-placeholder">Claude is analyzing adoption gaps and activation opportunities.</p>
-      ) : null}
-
-      {ANTHROPIC_API_KEY && error ? <p className="error-message">{error}</p> : null}
-
-      {ANTHROPIC_API_KEY && !isLoading && !error && summary ? (
-        <MarkdownBlock content={summary} />
-      ) : null}
-
-      {ANTHROPIC_API_KEY && !isLoading && !error && !summary ? (
-        <p className="summary-placeholder">
-          Click <strong>Generate summary</strong> to get AI-recommended actions for this company.
-        </p>
-      ) : null}
-    </section>
-  );
-}
-
 function StatusLegend({ activeStatus, onToggle }) {
   return (
     <div className="legend">
@@ -1004,14 +775,22 @@ function PersonCard({ person, highlightStatus }) {
 function CompanyCoverage({ records }) {
   const coverage = computeCoverage(records);
   const counts = collectStatusCounts(records);
+  const coverageQuality = getDepartmentBadgeClass(coverage.ratio / 100);
 
   return (
     <section className="coverage-panel">
       <div>
         <p className="eyebrow">Global Coverage</p>
-        <h2>{coverage.ratio.toFixed(0)}%</h2>
+        <div className="coverage-progress">
+          <ProgressBar value={coverage.ratio} qualityClass={`progress-bar__fill--${coverageQuality}`} />
+        </div>
+        <p className="coverage-progress__meta">
+          <span className="coverage-progress__fraction">
+            {coverage.coveredUsers} / {coverage.relevantUsers}
+          </span>
+          <span className="coverage-progress__hint"> relevant users covered (Active + Inactive)</span>
+        </p>
         <p className="coverage-copy">
-          {coverage.coveredUsers} covered users out of {coverage.relevantUsers} relevant users.
           Coverage counts Active and Created Account but inactive users, and excludes Not relevant users.
         </p>
       </div>
@@ -1069,10 +848,6 @@ export default function App() {
   const [records, setRecords] = useState(() => parseCsv(defaultCsv));
   const [selectedCompany, setSelectedCompany] = useState("");
   const [highlightStatus, setHighlightStatus] = useState(null);
-  const [aiSummary, setAiSummary] = useState("");
-  const [aiError, setAiError] = useState("");
-  const [isAiLoading, setIsAiLoading] = useState(false);
-  const [summaryNonce, setSummaryNonce] = useState(0);
   const [teamFlags, setTeamFlags] = useState(null);
   const [teamFlagsError, setTeamFlagsError] = useState("");
   const [isTeamFlagsLoading, setIsTeamFlagsLoading] = useState(false);
@@ -1100,48 +875,11 @@ export default function App() {
   );
 
   useEffect(() => {
-    setAiSummary("");
-    setAiError("");
-    setIsAiLoading(false);
     setTeamFlags(null);
     setTeamFlagsError("");
     setIsTeamFlagsLoading(false);
     setTeamFlagsNonce(0);
   }, [selectedCompany, records]);
-
-  useEffect(() => {
-    if (!summaryNonce || !ANTHROPIC_API_KEY || !selectedCompany || !companyRecords.length) {
-      return;
-    }
-
-    const controller = new AbortController();
-
-    async function runSummary() {
-      setIsAiLoading(true);
-      setAiError("");
-
-      try {
-        const summary = await generateCompanySummary(selectedCompany, companyRecords, controller.signal);
-
-        if (!controller.signal.aborted) {
-          setAiSummary(summary);
-        }
-      } catch (error) {
-        if (!controller.signal.aborted) {
-          setAiSummary("");
-          setAiError(error.message || "Unable to generate AI summary.");
-        }
-      } finally {
-        if (!controller.signal.aborted) {
-          setIsAiLoading(false);
-        }
-      }
-    }
-
-    runSummary();
-
-    return () => controller.abort();
-  }, [summaryNonce, selectedCompany, companyRecords]);
 
   useEffect(() => {
     if (!teamFlagsNonce || !ANTHROPIC_API_KEY || !selectedCompany || !companyRecords.length) {
@@ -1187,7 +925,6 @@ export default function App() {
             Select a company, inspect the org chart, and highlight users by activation status from a CSV source you can update later.
           </p>
         </div>
-        <CsvUploader onLoad={setRecords} />
       </section>
 
       <section className="toolbar">
@@ -1202,16 +939,6 @@ export default function App() {
           </select>
         </label>
       </section>
-
-      {selectedCompany ? (
-        <AiSummaryPanel
-          company={selectedCompany}
-          summary={aiSummary}
-          isLoading={isAiLoading}
-          error={aiError}
-          onRefresh={() => setSummaryNonce((value) => value + 1)}
-        />
-      ) : null}
 
       {selectedCompany ? <CompanyCoverage records={companyRecords} /> : null}
 
