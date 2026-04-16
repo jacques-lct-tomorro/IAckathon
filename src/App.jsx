@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import defaultCsv from "./data/default-org-data.csv?raw";
+import teamDisplayLabels from "./data/team-display-labels.json";
 
 const ANTHROPIC_API_KEY = import.meta.env.VITE_ANTHROPIC_API_KEY;
 const ANTHROPIC_MODEL = import.meta.env.VITE_ANTHROPIC_MODEL || "claude-sonnet-4-20250514";
@@ -34,6 +35,40 @@ const STATUS_CLASS = {
   "To Invite": "invite",
   "Not Relevant": "irrelevant",
 };
+
+/** Slug-style team keys from `team-display-labels.json` → labels in the UI */
+const TEAM_DISPLAY_LABELS = Object.freeze(teamDisplayLabels);
+
+function normalizeTeamSlug(rawTeam) {
+  let value = String(rawTeam || "").trim().toLowerCase();
+  if (!value) {
+    return "";
+  }
+
+  if (value.startsWith("user.team.")) {
+    value = value.slice("user.team.".length);
+  } else if (value.startsWith("user.team_")) {
+    value = value.slice("user.team_".length);
+  } else if (value.startsWith("user_team_")) {
+    value = value.slice("user_team_".length);
+  }
+
+  return value.replace(/\./g, "_");
+}
+
+function mapTeamDisplayName(rawTeam) {
+  const raw = String(rawTeam || "").trim();
+  if (!raw) {
+    return "";
+  }
+
+  const slug = normalizeTeamSlug(raw);
+  if (slug && TEAM_DISPLAY_LABELS[slug]) {
+    return TEAM_DISPLAY_LABELS[slug];
+  }
+
+  return raw;
+}
 
 function normalizeStatus(rawStatus) {
   const value = String(rawStatus || "").trim().toLowerCase();
@@ -86,11 +121,49 @@ function getDepartmentBadgeClass(ratio) {
   return "low";
 }
 
+function isLeadershipCandidate(person) {
+  const title = String(person.role || "").trim().toLowerCase();
+  const accessRole = String(person.accessRole || "").trim().toLowerCase();
+  const team = normalizeTeamSlug(person.team);
+
+  if (team === "general_management" || team === "executive") {
+    return true;
+  }
+
+  if (accessRole === "admin" || accessRole === "manager") {
+    return true;
+  }
+
+  return /(ceo|chief|founder|co-founder|president|vp|head|director|lead|manager|general counsel|cfo|coo|cto)/i.test(
+    title,
+  );
+}
+
 function buildDepartmentGroups(records) {
   const managerNames = new Set(records.map((person) => person.name));
-  const leaders = records.filter(
-    (person) => !person.managerName || !managerNames.has(person.managerName) || person.managerName === person.name,
+  const hasManagerData = records.some(
+    (person) => person.managerName && managerNames.has(person.managerName) && person.managerName !== person.name,
   );
+
+  let leaders;
+
+  if (hasManagerData) {
+    leaders = records.filter(
+      (person) => !person.managerName || !managerNames.has(person.managerName) || person.managerName === person.name,
+    );
+  } else {
+    const execTeamLeaders = records.filter(
+      (person) =>
+        ["general_management", "executive"].includes(normalizeTeamSlug(person.team)) &&
+        isLeadershipCandidate(person),
+    );
+
+    const inferredLeaders = execTeamLeaders.length
+      ? execTeamLeaders
+      : records.filter(isLeadershipCandidate);
+
+    leaders = inferredLeaders.length ? inferredLeaders : records.slice(0, 1);
+  }
 
   const leaderIds = new Set(leaders.map((person) => person.id));
   const teamMap = new Map();
@@ -166,14 +239,108 @@ function OrgTooltip({ person }) {
         <div className="org-tooltip__row">Team: <span>{person.team || "No team"}</span></div>
         <div className="org-tooltip__row">Manager: <span>{person.managerName || "Top level"}</span></div>
         <div className="org-tooltip__row">Status: <span>{STATUS_CONFIG[person.status].label}</span></div>
-        <div className="org-tooltip__row">Connections last month: <span>{person.connectionsLastMonth}</span></div>
+        <div className="org-tooltip__row">Last connected: <span>{person.lastConnectedAt || "—"}</span></div>
         <div className="org-tooltip__row">Email: <span>{person.email || "No email"}</span></div>
     </aside>
   );
 }
 
+function TeamMembers({ members, highlightStatus, onSelect }) {
+  const visibleMembers = members.slice(0, 5);
+  const overflowMembers = members.slice(5);
+
+  return (
+    <>
+      <div className="dept-members">
+        {visibleMembers.map((person) => (
+          <OrgNode
+            key={person.id}
+            person={person}
+            highlightStatus={highlightStatus}
+            onSelect={onSelect}
+          />
+        ))}
+      </div>
+
+      {overflowMembers.length ? (
+        <details className="dept-overflow">
+          <summary className="dept-overflow__summary">
+            Show {overflowMembers.length} more
+          </summary>
+          <div className="dept-members dept-members--overflow">
+            {overflowMembers.map((person) => (
+              <OrgNode
+                key={person.id}
+                person={person}
+                highlightStatus={highlightStatus}
+                onSelect={onSelect}
+              />
+            ))}
+          </div>
+        </details>
+      ) : null}
+    </>
+  );
+}
+
+function HorizontalScrollSlider({ containerRef, dependencyKey }) {
+  const [maxScroll, setMaxScroll] = useState(0);
+  const [scrollLeft, setScrollLeft] = useState(0);
+
+  useEffect(() => {
+    const element = containerRef.current;
+
+    if (!element) {
+      return undefined;
+    }
+
+    const sync = () => {
+      const nextMax = Math.max(0, element.scrollWidth - element.clientWidth);
+      setMaxScroll(nextMax);
+      setScrollLeft(Math.min(element.scrollLeft, nextMax));
+    };
+
+    sync();
+    element.addEventListener("scroll", sync);
+    window.addEventListener("resize", sync);
+
+    return () => {
+      element.removeEventListener("scroll", sync);
+      window.removeEventListener("resize", sync);
+    };
+  }, [containerRef, dependencyKey]);
+
+  if (maxScroll <= 0) {
+    return null;
+  }
+
+  return (
+    <div className="org-chart-slider">
+      <span className="org-chart-slider__label">Scroll</span>
+      <input
+        className="org-chart-slider__input"
+        type="range"
+        min={0}
+        max={maxScroll}
+        value={scrollLeft}
+        onChange={(event) => {
+          const element = containerRef.current;
+          const nextValue = Number(event.target.value);
+
+          setScrollLeft(nextValue);
+
+          if (element) {
+            element.scrollLeft = nextValue;
+          }
+        }}
+      />
+    </div>
+  );
+}
+
 function SimpleOrgChart({ records, highlightStatus }) {
   const [selectedPerson, setSelectedPerson] = useState(null);
+  const scrollRef = useRef(null);
   const structure = useMemo(() => buildDepartmentGroups(records), [records]);
 
   useEffect(() => {
@@ -186,53 +353,54 @@ function SimpleOrgChart({ records, highlightStatus }) {
 
   return (
     <>
-      <div className="simple-org">
-        <div className="simple-org__level simple-org__level--leaders">
-          {structure.leaders.map((person) => (
-            <OrgNode
-              key={person.id}
-              person={person}
-              highlightStatus={highlightStatus}
-              onSelect={setSelectedPerson}
-            />
-          ))}
-        </div>
+      <div ref={scrollRef} className="simple-org-scroll">
+        <div className="simple-org">
+          <div className="simple-org__level simple-org__level--leaders">
+            {structure.leaders.map((person) => (
+              <OrgNode
+                key={person.id}
+                person={person}
+                highlightStatus={highlightStatus}
+                onSelect={setSelectedPerson}
+              />
+            ))}
+          </div>
 
-        {structure.departments.length ? (
-          <>
-            <div className="simple-org__connector">
-              <div className="simple-org__vline" />
-            </div>
+          {structure.departments.length ? (
+            <>
+              <div className="simple-org__connector">
+                <div className="simple-org__vline" />
+              </div>
 
-            <div className="simple-org__departments">
-              {structure.departments.map((department) => (
-                <section key={department.team} className="dept-block">
-                  <div className="dept-block__header">
-                    <div className="dept-label">{department.team}</div>
-                    <div className="dept-progress">
-                      <ProgressBar
-                        value={department.ratio * 100}
-                        qualityClass={`progress-bar__fill--${getDepartmentBadgeClass(department.ratio)}`}
-                      />
+              <div className="simple-org__departments">
+                {structure.departments.map((department) => (
+                  <section key={department.team} className="dept-block">
+                    <div className="dept-block__header">
+                      <div className="dept-label">{department.team}</div>
+                      <div className="dept-progress">
+                        <ProgressBar
+                          value={department.ratio * 100}
+                          qualityClass={`progress-bar__fill--${getDepartmentBadgeClass(department.ratio)}`}
+                        />
+                      </div>
                     </div>
-                  </div>
 
-                  <div className="dept-members">
-                    {department.members.map((person) => (
-                      <OrgNode
-                        key={person.id}
-                        person={person}
-                        highlightStatus={highlightStatus}
-                        onSelect={setSelectedPerson}
-                      />
-                    ))}
-                  </div>
-                </section>
-              ))}
-            </div>
-          </>
-        ) : null}
+                    <TeamMembers
+                      members={department.members}
+                      highlightStatus={highlightStatus}
+                      onSelect={setSelectedPerson}
+                    />
+                  </section>
+                ))}
+              </div>
+            </>
+          ) : null}
+        </div>
       </div>
+      <HorizontalScrollSlider
+        containerRef={scrollRef}
+        dependencyKey={`${records.length}-${highlightStatus || "all"}-${structure.departments.length}`}
+      />
 
       <OrgTooltip person={selectedPerson} />
     </>
@@ -278,6 +446,88 @@ function splitCsvLine(line) {
   return cells.map((cell) => cell.trim());
 }
 
+function parseLastConnectedAt(rawValue) {
+  const value = String(rawValue || "").trim();
+
+  if (!value) {
+    return null;
+  }
+
+  const directDate = new Date(value);
+
+  if (!Number.isNaN(directDate.getTime())) {
+    return directDate;
+  }
+
+  const normalized = value
+    .replace(/^janvier/i, "January")
+    .replace(/^fevrier/i, "February")
+    .replace(/^février/i, "February")
+    .replace(/^mars/i, "March")
+    .replace(/^avril/i, "April")
+    .replace(/^mai/i, "May")
+    .replace(/^juin/i, "June")
+    .replace(/^juillet/i, "July")
+    .replace(/^aout/i, "August")
+    .replace(/^août/i, "August")
+    .replace(/^septembre/i, "September")
+    .replace(/^octobre/i, "October")
+    .replace(/^novembre/i, "November")
+    .replace(/^decembre/i, "December")
+    .replace(/^décembre/i, "December");
+
+  const normalizedDate = new Date(normalized);
+  return Number.isNaN(normalizedDate.getTime()) ? null : normalizedDate;
+}
+
+function alignRowValues(headers, values) {
+  if (values.length === headers.length) {
+    return values;
+  }
+
+  if (values.length === headers.length - 1 && String(values[0] || "").includes("@")) {
+    return ["", ...values];
+  }
+
+  if (values.length > headers.length) {
+    const overflow = values.length - headers.length;
+    const mergedFirstColumn = values.slice(0, overflow + 1).join(", ");
+    return [mergedFirstColumn, ...values.slice(overflow + 1)];
+  }
+
+  return [...values, ...Array.from({ length: headers.length - values.length }, () => "")];
+}
+
+function deriveStatus(rawRecord, lastConnectedAt) {
+  const explicitStatus = rawRecord.status || rawRecord.statue;
+
+  if (explicitStatus) {
+    return normalizeStatus(explicitStatus);
+  }
+
+  const role = String(rawRecord.dim_user_user_role || rawRecord.role || "")
+    .trim()
+    .toLowerCase();
+
+  if (!role) {
+    return "To Invite";
+  }
+
+  if (!lastConnectedAt) {
+    return "Inactive";
+  }
+
+  const now = new Date();
+  const daysSinceLastConnection =
+    (now.getTime() - lastConnectedAt.getTime()) / (1000 * 60 * 60 * 24);
+
+  if (daysSinceLastConnection <= 30) {
+    return "Active";
+  }
+
+  return "Inactive";
+}
+
 function parseCsv(text) {
   const lines = text
     .replace(/\r/g, "")
@@ -292,22 +542,65 @@ function parseCsv(text) {
   const headers = splitCsvLine(lines[0]).map((header) => toSlug(header));
 
   return lines.slice(1).map((line, rowIndex) => {
-    const values = splitCsvLine(line);
+    const values = alignRowValues(headers, splitCsvLine(line));
     const rawRecord = headers.reduce((record, header, columnIndex) => {
       record[header] = values[columnIndex] || "";
       return record;
     }, {});
 
+    const lastConnectedAt = parseLastConnectedAt(
+      rawRecord.last_connected_at || rawRecord.last_connection_at,
+    );
+    const status = deriveStatus(rawRecord, lastConnectedAt);
+    const displayName =
+      rawRecord.dim_user_user_full_name ||
+      rawRecord.full_name ||
+      rawRecord.name ||
+      rawRecord.dim_user_user_email ||
+      rawRecord.email ||
+      "Unknown user";
+    const email = rawRecord.dim_user_user_email || rawRecord.email || "";
+    const role =
+      rawRecord.dim_user_user_job_title ||
+      rawRecord.job_title ||
+      rawRecord.role ||
+      rawRecord.title ||
+      "";
+    const rawTeam =
+      rawRecord.dim_user_user_team ||
+      rawRecord.team ||
+      rawRecord.department ||
+      "";
+    const team = mapTeamDisplayName(rawTeam);
+    const company =
+      rawRecord.dim_user_user_organization_name ||
+      rawRecord.organization_name ||
+      rawRecord.company ||
+      "Unknown Company";
+    const accessRole =
+      rawRecord.dim_user_user_role ||
+      rawRecord.user_role ||
+      rawRecord.role ||
+      "";
+
     return {
-      id: `${toSlug(rawRecord.company)}-${toSlug(rawRecord.email || rawRecord.name)}-${rowIndex}`,
-      company: rawRecord.company || "Unknown Company",
-      name: rawRecord.name || "Unknown user",
-      initials: rawRecord.initials || (rawRecord.name || "?").split(" ").map((part) => part[0]).join("").slice(0, 2).toUpperCase(),
-      email: rawRecord.email || "",
-      role: rawRecord.role || rawRecord.title || "",
-      team: rawRecord.team || rawRecord.department || "",
+      id: `${toSlug(company)}-${toSlug(email || displayName)}-${rowIndex}`,
+      company,
+      name: displayName,
+      initials:
+        rawRecord.initials ||
+        displayName
+          .split(" ")
+          .map((part) => part[0])
+          .join("")
+          .slice(0, 2)
+          .toUpperCase(),
+      email,
+      role,
+      team,
+      accessRole,
       managerName: rawRecord.manager_name || rawRecord.manager || "",
-      status: normalizeStatus(rawRecord.status || rawRecord.statue),
+      status,
       budgetHolder:
         ["true", "yes", "y", "1", "budget holder"].includes(
           String(
@@ -324,9 +617,10 @@ function parseCsv(text) {
           rawRecord.number_of_connections_last_month ||
           rawRecord.connections_last_month ||
           rawRecord.number_in_connexion_in_last_month ||
-          "0",
+          (status === "Active" ? "1" : "0"),
         10,
       ) || 0,
+      lastConnectedAt: rawRecord.last_connected_at || "",
     };
   });
 }
