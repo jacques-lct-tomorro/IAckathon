@@ -73,6 +73,170 @@ input {
   padding: 32px 32px 30px;
 }
 
+.oroscope-logo {
+  position: relative;
+  overflow: hidden;
+  width: min(100%, 520px);
+  margin-bottom: 20px;
+  padding: 0;
+  border-radius: 0;
+  background:
+    radial-gradient(circle at 18% 18%, rgba(74, 222, 128, 0.12), transparent 28%),
+    radial-gradient(circle at 88% 85%, rgba(74, 222, 128, 0.06), transparent 24%);
+}
+
+.oroscope-logo__badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 1px solid #111111;
+  background: #ffffff;
+  color: #111111;
+  font-size: 0.64rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.oroscope-logo__live-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: #ef4444;
+  animation: oroscope-pulse 1.5s ease-in-out infinite;
+}
+
+.oroscope-logo__content {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  margin-top: 14px;
+}
+
+.oroscope-logo__mark {
+  flex: 0 0 140px;
+}
+
+.oroscope-logo__mark svg {
+  width: 140px;
+  height: 120px;
+  display: block;
+}
+
+.oroscope-logo__sun-group {
+  animation: oroscope-pulse 3s ease-in-out infinite;
+}
+
+.oroscope-logo__satellite {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.oroscope-logo__satellite--1 {
+  animation: oroscope-orbit-1 8s linear infinite;
+}
+
+.oroscope-logo__satellite--2 {
+  animation: oroscope-orbit-2 14s linear infinite;
+}
+
+.oroscope-logo__satellite--3 {
+  animation: oroscope-orbit-3 22s linear infinite;
+}
+
+.oroscope-logo__wordmark {
+  min-width: 0;
+}
+
+.oroscope-logo__name {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0;
+  font-size: clamp(2rem, 5vw, 3.3rem);
+  line-height: 0.92;
+  font-weight: 800;
+  letter-spacing: -0.06em;
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+
+.oroscope-logo__name--accent {
+  color: var(--text-primary);
+}
+
+.oroscope-logo__tagline {
+  margin-top: 12px;
+  color: var(--text-secondary);
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+
+@keyframes oroscope-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.65;
+  }
+}
+
+@keyframes oroscope-orbit-1 {
+  0% {
+    transform: translate(0, -20px);
+  }
+  25% {
+    transform: translate(33px, 0);
+  }
+  50% {
+    transform: translate(0, 20px);
+  }
+  75% {
+    transform: translate(-33px, 0);
+  }
+  100% {
+    transform: translate(0, -20px);
+  }
+}
+
+@keyframes oroscope-orbit-2 {
+  0% {
+    transform: translate(54px, 0);
+  }
+  25% {
+    transform: translate(0, 31px);
+  }
+  50% {
+    transform: translate(-54px, 0);
+  }
+  75% {
+    transform: translate(0, -31px);
+  }
+  100% {
+    transform: translate(54px, 0);
+  }
+}
+
+@keyframes oroscope-orbit-3 {
+  0% {
+    transform: translate(-74px, 0);
+  }
+  25% {
+    transform: translate(0, 42px);
+  }
+  50% {
+    transform: translate(74px, 0);
+  }
+  75% {
+    transform: translate(0, -42px);
+  }
+  100% {
+    transform: translate(-74px, 0);
+  }
+}
+
 .hero__actions {
   display: flex;
   flex-direction: column;
@@ -1593,6 +1757,19 @@ input {
 
   .hero {
     flex-direction: column;
+  }
+
+  .oroscope-logo__content {
+    gap: 16px;
+  }
+
+  .oroscope-logo__mark {
+    flex-basis: 108px;
+  }
+
+  .oroscope-logo__mark svg {
+    width: 108px;
+    height: 96px;
   }
 
   .hero__actions {
