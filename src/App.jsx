@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import defaultCsv from "./data/default-org-data.csv?raw";
 import { API_BASE } from "./constants.js";
 import { CompanyCoverage } from "./components/CompanyCoverage.jsx";
+import { CompanySelect } from "./components/CompanySelect.jsx";
 import { LoginForm } from "./components/LoginForm.jsx";
 import { SimpleOrgChart } from "./components/SimpleOrgChart.jsx";
 import { StatusLegend } from "./components/StatusLegend.jsx";
@@ -208,19 +209,11 @@ export default function App() {
       </section>
 
       <section className="toolbar">
-        <label className="field">
-          <span>Company</span>
-          <select
-            value={selectedCompany}
-            onChange={(event) => setSelectedCompany(event.target.value)}
-          >
-            {companies.map((company) => (
-              <option key={company} value={company}>
-                {company}
-              </option>
-            ))}
-          </select>
-        </label>
+        <CompanySelect
+          companies={companies}
+          value={selectedCompany}
+          onChange={setSelectedCompany}
+        />
       </section>
 
       {selectedCompany ? <CompanyCoverage records={companyRecords} /> : null}
