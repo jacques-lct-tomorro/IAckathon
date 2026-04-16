@@ -1,0 +1,15 @@
+company,name,initials,email,title,department,manager_name,status,budget_holder,number_of_connections_last_month
+Acme France,Sophie Martin,SM,s.martin@acme.fr,CEO,Executive,,Active,Yes,18
+Acme France,Michel Durand,MD,m.durand@acme.fr,Chief Legal Officer,Legal,Sophie Martin,Inactive,Yes,2
+Acme France,Julie Bernard,JB,j.bernard@acme.fr,Head of Sales,Sales,Sophie Martin,Active,Yes,12
+Acme France,Karim Petit,KP,k.petit@acme.fr,Senior Legal Counsel,Legal,Michel Durand,To Invite,No,0
+Acme France,Lea Robert,LR,l.robert@acme.fr,Legal Operations Manager,Legal,Michel Durand,Not Relevant,No,0
+Acme France,Thomas Leroy,TL,t.leroy@acme.fr,Account Executive,Sales,Julie Bernard,Active,No,9
+Acme France,Claire Moreau,CM,c.moreau@acme.fr,Sales Operations Analyst,Sales,Julie Bernard,Inactive,No,1
+Globex Europe,Emma Petit,EP,e.petit@globex.eu,Managing Director,Executive,,Active,Yes,15
+Globex Europe,Nicolas Simon,NS,n.simon@globex.eu,VP Product,Product,Emma Petit,Active,Yes,11
+Globex Europe,Laura Henry,LH,l.henry@globex.eu,VP People,People,Emma Petit,Inactive,Yes,3
+Globex Europe,David Roux,DR,d.roux@globex.eu,Engineering Manager,Engineering,Nicolas Simon,Active,No,14
+Globex Europe,Ines Garcia,IG,i.garcia@globex.eu,Product Designer,Product,Nicolas Simon,To Invite,No,0
+Globex Europe,Paul Marchand,PM,p.marchand@globex.eu,Talent Partner,People,Laura Henry,Not Relevant,No,0
+Globex Europe,Manon Leroy,ML,m.leroy@globex.eu,Software Engineer,Engineering,David Roux,Active,No,20
