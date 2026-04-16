@@ -53,7 +53,7 @@ Rules:
 - Emit one object per team in the input, same teams, no extras.
 - Write flags as sharp, specific observations; avoid generic platitudes.
 - If red_flags would be empty, still include 1 mild watch-item grounded in the data.
-- health_tier must reflect adoption_ratio_among_relevant and engagement patterns: strong (~>=70 and healthy engagement), medium (~40-69 or mixed), risk (<40 or multiple inactive budget holders), watchlist (tiny team or mostly Not Relevant skew—explain in subtitle).
+- health_tier must reflect adoption_ratio_among_relevant and engagement patterns: strong (~>=70 and healthy engagement), medium (~40-69 or mixed), risk (<40 or multiple inactive budget holders), watchlist (tiny team or mostly Whitespace skew—explain in subtitle).
 - action_label must logically follow the red_flags / green_flags balance.
 `.trim();
   }

@@ -16,23 +16,17 @@ const STATUS_CONFIG = {
     badge: "Orange",
   },
   "To Invite": {
-    label: "To invite",
+    label: "Whitespace",
     color: "#2d6df6",
     badge: "Blue",
   },
-  "Not Relevant": {
-    label: "Not relevant",
-    color: "#95a1b2",
-    badge: "Grey",
-  },
 };
 
-const STATUS_ORDER = ["Active", "Inactive", "To Invite", "Not Relevant"];
+const STATUS_ORDER = ["Active", "Inactive", "To Invite"];
 const STATUS_CLASS = {
   Active: "active",
   Inactive: "inactive",
   "To Invite": "invite",
-  "Not Relevant": "irrelevant",
 };
 
 /** Slug-style team keys from `team-display-labels.json` → labels in the UI */
@@ -98,14 +92,14 @@ function normalizeStatus(rawStatus) {
     value === "irrelevant" ||
     value === "grey"
   ) {
-    return "Not Relevant";
+    return "Inactive";
   }
 
-  return "Not Relevant";
+  return "Inactive";
 }
 
 function getStatusClass(status) {
-  return STATUS_CLASS[status] || "irrelevant";
+  return STATUS_CLASS[status] || "inactive";
 }
 
 function getDepartmentBadgeClass(ratio) {
@@ -217,7 +211,7 @@ function buildDepartmentGroups(records) {
       const users = everyone
         .filter((person) => !isTeamAdmin(person) && !isTeamManager(person))
         .sort((left, right) => left.name.localeCompare(right.name));
-      const relevantMembers = everyone.filter((person) => person.status !== "Not Relevant");
+      const relevantMembers = everyone;
       const coveredMembers = relevantMembers.filter(
         (person) => person.status === "Active" || person.status === "Inactive",
       );
@@ -314,10 +308,7 @@ function OrgTooltip({ person }) {
         Team: <span>{person.team || "No team"}</span>
       </div>
       <div className="org-tooltip__row">
-        Manager: <span>{person.managerName || "Top level"}</span>
-      </div>
-      <div className="org-tooltip__row">
-        Status: <span>{STATUS_CONFIG[person.status].label}</span>
+        Status: <span>{STATUS_CONFIG[person.status]?.label || person.status}</span>
       </div>
       <div className="org-tooltip__row">
         Last connected: <span>{person.lastConnectedAt || "—"}</span>
@@ -738,9 +729,7 @@ function collectStatusCounts(records) {
 }
 
 function computeCoverage(records) {
-  const relevantUsers = records.filter(
-    (person) => person.status !== "Not Relevant",
-  );
+  const relevantUsers = records;
   const coveredUsers = relevantUsers.filter(
     (person) => person.status === "Active" || person.status === "Inactive",
   );
@@ -789,9 +778,7 @@ function buildTeamMetricsPayload(company, records) {
       ...(department.users || []),
     ];
     const counts = collectStatusCounts(members);
-    const relevantMembers = members.filter(
-      (person) => person.status !== "Not Relevant",
-    );
+    const relevantMembers = members;
     const activeMembers = members.filter(
       (person) => person.status === "Active",
     );
@@ -1191,7 +1178,10 @@ function StatusLegend({ activeStatus, onToggle }) {
 }
 
 function PersonCard({ person, highlightStatus }) {
-  const config = STATUS_CONFIG[person.status];
+  const config = STATUS_CONFIG[person.status] || {
+    label: person.status,
+    color: "#95a1b2",
+  };
   const isDimmed = highlightStatus && person.status !== highlightStatus;
 
   return (
@@ -1218,7 +1208,7 @@ function PersonCard({ person, highlightStatus }) {
       <dl className="person-card__stats">
         <div>
           <dt>Status</dt>
-          <dd>{STATUS_CONFIG[person.status].label}</dd>
+          <dd>{STATUS_CONFIG[person.status]?.label || person.status}</dd>
         </div>
         <div>
           <dt>Connections last month</dt>
@@ -1254,8 +1244,9 @@ function CompanyCoverage({ records }) {
           </span>
         </p>
         <p className="coverage-copy">
-          Coverage counts Active and Created Account but inactive users, and
-          excludes Not relevant users.
+          Coverage is the share of teammates who are Active or Inactive. Whitespace
+          (invited, not yet on board) counts toward the total but not toward covered
+          until they connect.
         </p>
       </div>
       <div className="coverage-grid">
@@ -1266,7 +1257,7 @@ function CompanyCoverage({ records }) {
               style={{ backgroundColor: STATUS_CONFIG[status].color }}
             />
             <strong>{counts[status]}</strong>
-            <span>{STATUS_CONFIG[status].label}</span>
+            <span>{STATUS_CONFIG[status]?.label || status}</span>
           </div>
         ))}
       </div>
