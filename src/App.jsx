@@ -800,7 +800,13 @@ function buildTeamMetricsPayload(company, records) {
   });
 }
 
-async function generateTeamFlags(company, records, signal, onUnauthorized) {
+async function generateTeamFlags(
+  company,
+  records,
+  signal,
+  onUnauthorized,
+  onTeam,
+) {
   const structure = buildDepartmentGroups(records);
 
   if (!structure.departments.length) {
@@ -830,8 +836,85 @@ async function generateTeamFlags(company, records, signal, onUnauthorized) {
     throw new Error(message || `Backend error ${response.status}`);
   }
 
-  const data = await response.json();
-  return data.teams;
+  if (!response.body) {
+    throw new Error("Unable to read team insights stream.");
+  }
+
+  const reader = response.body.getReader();
+  const onAbort = () => {
+    reader.cancel().catch(() => {});
+  };
+  if (signal) {
+    if (signal.aborted) {
+      reader.cancel().catch(() => {});
+      throw new DOMException("Aborted", "AbortError");
+    }
+    signal.addEventListener("abort", onAbort);
+  }
+
+  const decoder = new TextDecoder();
+  let carry = "";
+  const collected = [];
+  let sawDone = false;
+
+  function parseSseEventBlock(block) {
+    const lines = block.split("\n").map((l) => l.replace(/\r$/, ""));
+    for (const line of lines) {
+      if (!line.startsWith("data:")) {
+        continue;
+      }
+      const jsonStr = line.replace(/^data:\s?/, "").trim();
+      if (!jsonStr) {
+        continue;
+      }
+      let evt;
+      try {
+        evt = JSON.parse(jsonStr);
+      } catch {
+        continue;
+      }
+      if (evt.type === "team" && evt.data) {
+        collected.push(evt.data);
+        onTeam?.(evt.data);
+      } else if (evt.type === "error") {
+        throw new Error(evt.message || "Stream error");
+      } else if (evt.type === "done") {
+        sawDone = true;
+      }
+    }
+  }
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      carry += decoder.decode(value || new Uint8Array(), { stream: !done });
+
+      const events = carry.split("\n\n");
+      carry = events.pop() ?? "";
+
+      for (const rawEvent of events) {
+        parseSseEventBlock(rawEvent);
+      }
+
+      if (done) {
+        break;
+      }
+    }
+
+    if (carry.trim()) {
+      parseSseEventBlock(carry);
+    }
+  } finally {
+    signal?.removeEventListener("abort", onAbort);
+  }
+
+  if (!sawDone && collected.length === 0) {
+    throw new Error(
+      "Connection closed before any team insights were received.",
+    );
+  }
+
+  return collected;
 }
 
 const TEAM_TIER_LABELS = {
@@ -840,6 +923,74 @@ const TEAM_TIER_LABELS = {
   risk: "At risk",
   watchlist: "Watchlist",
 };
+
+function TeamFlagsAiStatus({ receivedCount, expectedCount }) {
+  const indeterminate = receivedCount === 0;
+  const pct =
+    expectedCount > 0
+      ? Math.min(100, Math.round((receivedCount / expectedCount) * 100))
+      : 0;
+
+  return (
+    <div className="team-flags-ai-status" role="status" aria-live="polite">
+      <div className="team-flags-ai-status__pulse" aria-hidden="true">
+        <span />
+        <span />
+        <span />
+      </div>
+      <div className="team-flags-ai-status__copy">
+        <strong>Claude is generating your team signals</strong>
+        <span className="team-flags-ai-status__sub">
+          {receivedCount > 0
+            ? `Received ${receivedCount} of ${expectedCount} team cards — more arriving momentarily.`
+            : `Reading ${expectedCount} teams from your org data and drafting green flags, red flags, and actions.`}
+        </span>
+      </div>
+      <div
+        className={`team-flags-ai-status__bar${
+          indeterminate ? " team-flags-ai-status__bar--indeterminate" : ""
+        }`}
+      >
+        <div
+          className="team-flags-ai-status__bar-fill"
+          style={indeterminate ? undefined : { width: `${pct}%` }}
+        />
+      </div>
+      <div className="team-flags-ai-status__spark" aria-hidden="true" />
+    </div>
+  );
+}
+
+function TeamFlagSkeletonCard() {
+  return (
+    <article
+      className="team-flag-card team-flag-card--skeleton"
+      aria-hidden="true"
+    >
+      <header className="team-flag-card__header">
+        <div className="team-flag-card__titles">
+          <div className="team-flag-skel team-flag-skel--title" />
+          <div className="team-flag-skel team-flag-skel--muted" />
+        </div>
+        <div className="team-flag-skel team-flag-skel--badge" />
+      </header>
+      <div className="team-flag-skel team-flag-skel--subtitle" />
+      <div className="team-flag-card__body">
+        <div className="team-flag-card__column team-flag-card__column--green">
+          <div className="team-flag-skel team-flag-skel--line" />
+          <div className="team-flag-skel team-flag-skel--line" />
+          <div className="team-flag-skel team-flag-skel--line team-flag-skel--short" />
+        </div>
+        <div className="team-flag-card__column team-flag-card__column--red">
+          <div className="team-flag-skel team-flag-skel--line" />
+          <div className="team-flag-skel team-flag-skel--line" />
+          <div className="team-flag-skel team-flag-skel--line team-flag-skel--short" />
+        </div>
+      </div>
+      <div className="team-flag-skel team-flag-skel--action" />
+    </article>
+  );
+}
 
 function TeamHealthPanel({
   company,
@@ -851,6 +1002,14 @@ function TeamHealthPanel({
 }) {
   const structure = useMemo(() => buildDepartmentGroups(records), [records]);
   const hasTeams = structure.departments.length > 0;
+  const expectedTeamCount = structure.departments.length;
+  const receivedCount = teams?.length ?? 0;
+  const skeletonSlots =
+    isLoading && hasTeams
+      ? Math.max(0, expectedTeamCount - receivedCount)
+      : 0;
+  const showTeamGrid =
+    !error && hasTeams && (isLoading || (teams?.length ?? 0) > 0);
 
   return (
     <section className="team-flags">
@@ -884,17 +1043,18 @@ function TeamHealthPanel({
         </p>
       ) : null}
 
-      {isLoading ? (
-        <p className="summary-placeholder">
-          Mapping adoption patterns to green flags, red flags, and next actions.
-        </p>
+      {isLoading && hasTeams ? (
+        <TeamFlagsAiStatus
+          receivedCount={receivedCount}
+          expectedCount={expectedTeamCount}
+        />
       ) : null}
 
       {error ? <p className="error-message">{error}</p> : null}
 
-      {!isLoading && !error && teams?.length ? (
+      {showTeamGrid ? (
         <div className="team-flags__grid">
-          {teams.map((team) => (
+          {(teams ?? []).map((team) => (
             <article key={team.team} className="team-flag-card">
               <header className="team-flag-card__header">
                 <div className="team-flag-card__titles">
@@ -956,6 +1116,9 @@ function TeamHealthPanel({
                 </span>
               </button>
             </article>
+          ))}
+          {Array.from({ length: skeletonSlots }, (_, index) => (
+            <TeamFlagSkeletonCard key={`team-flag-skeleton-${index}`} />
           ))}
         </div>
       ) : null}
@@ -1380,6 +1543,7 @@ export default function App() {
     async function runTeamFlags() {
       setIsTeamFlagsLoading(true);
       setTeamFlagsError("");
+      setTeamFlags([]);
 
       try {
         const teams = await generateTeamFlags(
@@ -1387,6 +1551,11 @@ export default function App() {
           companyRecords,
           controller.signal,
           () => setUser(null),
+          (team) => {
+            if (!controller.signal.aborted) {
+              setTeamFlags((prev) => [...prev, team]);
+            }
+          },
         );
 
         if (!controller.signal.aborted) {
