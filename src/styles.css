@@ -549,6 +549,13 @@ input {
   padding: 26px 28px;
 }
 
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 24px 32px;
+}
+
 .team-flags {
   background: linear-gradient(180deg, #eef1ec 0%, var(--card) 38%, var(--card) 100%);
 }
