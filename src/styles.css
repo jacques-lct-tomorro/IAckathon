@@ -136,6 +136,201 @@ input {
     linear-gradient(135deg, rgba(104, 239, 63, 0.1) 0%, rgba(49, 68, 54, 0.88) 36%, rgba(15, 23, 16, 0.98) 100%);
 }
 
+.team-flags {
+  background: linear-gradient(180deg, rgba(32, 38, 34, 0.95) 0%, rgba(12, 18, 14, 0.98) 100%);
+}
+
+.team-flags__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.team-flags__header h2 {
+  margin: 0;
+  font-family: "Space Grotesk", "IBM Plex Sans", sans-serif;
+  font-size: clamp(1.35rem, 2vw, 1.85rem);
+}
+
+.team-flags__lede {
+  margin: 10px 0 0;
+  max-width: 72ch;
+  color: var(--text-secondary);
+  font-size: 0.95rem;
+}
+
+.team-flags__grid {
+  margin-top: 20px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.team-flag-card {
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: linear-gradient(180deg, rgba(42, 48, 44, 0.95) 0%, rgba(18, 24, 20, 0.98) 100%);
+  padding: 18px 18px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 100%;
+}
+
+.team-flag-card__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.team-flag-card__titles h3 {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: -0.01em;
+}
+
+.team-flag-card__team {
+  margin: 4px 0 0;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+
+.team-flag-card__badge {
+  flex-shrink: 0;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+}
+
+.team-flag-card__badge--strong {
+  background: rgba(104, 239, 63, 0.18);
+  color: #c9f7b2;
+  border-color: rgba(104, 239, 63, 0.35);
+}
+
+.team-flag-card__badge--medium {
+  background: rgba(240, 139, 45, 0.16);
+  color: #ffd9b8;
+  border-color: rgba(240, 139, 45, 0.35);
+}
+
+.team-flag-card__badge--risk {
+  background: rgba(255, 107, 90, 0.14);
+  color: #ffc8c0;
+  border-color: rgba(255, 107, 90, 0.35);
+}
+
+.team-flag-card__badge--watchlist {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-secondary);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.team-flag-card__subtitle {
+  margin: 0;
+  font-size: 0.86rem;
+  color: var(--text-muted);
+  line-height: 1.45;
+}
+
+.team-flag-card__body {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.team-flag-card__column {
+  border-radius: 14px;
+  padding: 10px 10px 10px 12px;
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-left: 3px solid transparent;
+}
+
+.team-flag-card__column--green {
+  border-left-color: rgba(104, 239, 63, 0.55);
+}
+
+.team-flag-card__column--red {
+  border-left-color: rgba(255, 107, 90, 0.55);
+}
+
+.team-flag-card__column-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.68rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.team-flag-card__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+}
+
+.team-flag-card__dot--green {
+  background: #5fd34a;
+  box-shadow: 0 0 0 4px rgba(104, 239, 63, 0.12);
+}
+
+.team-flag-card__dot--red {
+  background: #ff6b5a;
+  box-shadow: 0 0 0 4px rgba(255, 107, 90, 0.12);
+}
+
+.team-flag-card__column ul {
+  margin: 0;
+  padding: 0 0 0 14px;
+  color: var(--text-primary);
+  font-size: 0.84rem;
+  line-height: 1.45;
+}
+
+.team-flag-card__column li + li {
+  margin-top: 8px;
+}
+
+.team-flag-card__empty {
+  color: var(--text-muted);
+  list-style: none;
+  margin-left: -14px;
+}
+
+.team-flag-card__action {
+  margin-top: auto;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(242, 234, 223, 0.22);
+  background: transparent;
+  color: var(--text-primary);
+  font-weight: 600;
+  font-size: 0.88rem;
+  cursor: default;
+}
+
+.team-flag-card__action-icon {
+  font-size: 1rem;
+  opacity: 0.85;
+}
+
 .ai-summary__header {
   display: flex;
   align-items: flex-start;
@@ -570,9 +765,18 @@ input {
   .toolbar,
   .filters,
   .org-chart-section,
-  .coverage-panel {
+  .coverage-panel,
+  .team-flags {
     padding: 18px;
     border-radius: 20px;
+  }
+
+  .team-flags__grid {
+    grid-template-columns: 1fr;
+  }
+
+  .team-flag-card__body {
+    grid-template-columns: 1fr;
   }
 
   .coverage-grid {

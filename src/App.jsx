@@ -744,7 +744,9 @@ function TeamHealthPanel({
                   </div>
                   <ul>
                     {team.green_flags.length ? (
-                      team.green_flags.map((item) => <li key={item}>{item}</li>)
+                      team.green_flags.map((item, index) => (
+                        <li key={`${team.team}-green-${index}`}>{item}</li>
+                      ))
                     ) : (
                       <li className="team-flag-card__empty">No green flags returned.</li>
                     )}
@@ -758,7 +760,9 @@ function TeamHealthPanel({
                   </div>
                   <ul>
                     {team.red_flags.length ? (
-                      team.red_flags.map((item) => <li key={item}>{item}</li>)
+                      team.red_flags.map((item, index) => (
+                        <li key={`${team.team}-red-${index}`}>{item}</li>
+                      ))
                     ) : (
                       <li className="team-flag-card__empty">No red flags returned.</li>
                     )}
