@@ -969,6 +969,13 @@ const TEAM_TIER_LABELS = {
   watchlist: "Watchlist",
 };
 
+const TEAM_TIER_SORT_ORDER = {
+  risk: 0,
+  watchlist: 1,
+  medium: 2,
+  strong: 3,
+};
+
 function TeamFlagsAiStatus({ receivedCount, expectedCount }) {
   const indeterminate = receivedCount === 0;
   const pct =
@@ -1050,7 +1057,23 @@ function TeamHealthPanel({
   const expectedTeamCount = structure.departments.length;
   const receivedCount = teams?.length ?? 0;
   const skeletonSlots =
-    isLoading && hasTeams ? Math.max(0, expectedTeamCount - receivedCount) : 0;
+    isLoading && hasTeams
+      ? Math.max(0, expectedTeamCount - receivedCount)
+      : 0;
+  const orderedTeams = useMemo(
+    () =>
+      [...(teams ?? [])].sort((left, right) => {
+        const leftRank = TEAM_TIER_SORT_ORDER[left.health_tier] ?? 99;
+        const rightRank = TEAM_TIER_SORT_ORDER[right.health_tier] ?? 99;
+
+        if (leftRank !== rightRank) {
+          return leftRank - rightRank;
+        }
+
+        return left.team.localeCompare(right.team);
+      }),
+    [teams],
+  );
   const showTeamGrid =
     !error && hasTeams && (isLoading || (teams?.length ?? 0) > 0);
 
@@ -1092,12 +1115,12 @@ function TeamHealthPanel({
 
       {showTeamGrid ? (
         <div className="team-flags__grid">
-          {(teams ?? []).map((team) => (
+          {orderedTeams.map((team) => (
             <article key={team.team} className="team-flag-card">
               <header className="team-flag-card__header">
                 <div className="team-flag-card__titles">
-                  <h3>{team.card_title}</h3>
-                  <p className="team-flag-card__team">{team.team}</p>
+                  <h3>{team.team}</h3>
+                  <p className="team-flag-card__team">{team.card_title}</p>
                 </div>
                 <span
                   className={`team-flag-card__badge team-flag-card__badge--${team.health_tier}`}
@@ -1649,8 +1672,7 @@ export default function App() {
         <div>
           <h1>OroScope</h1>
           <p className="hero-copy">
-            Select a company, inspect the org chart, and highlight users by
-            activation status from a CSV source you can update later.
+          The living org chart that turns account knowledge into new revenue.
           </p>
         </div>
         <div className="hero__actions">
