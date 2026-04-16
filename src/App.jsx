@@ -2,9 +2,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import defaultCsv from "./data/default-org-data.csv?raw";
 import teamDisplayLabels from "./data/team-display-labels.json";
 
-const ANTHROPIC_API_KEY = import.meta.env.VITE_ANTHROPIC_API_KEY;
-const ANTHROPIC_MODEL = import.meta.env.VITE_ANTHROPIC_MODEL || "claude-sonnet-4-20250514";
-
 const STATUS_CONFIG = {
   Active: {
     label: "Active user",
@@ -741,96 +738,6 @@ function buildTeamMetricsPayload(company, records) {
   });
 }
 
-function buildTeamFlagsPrompt(company, records) {
-  const teams = buildTeamMetricsPayload(company, records);
-
-  return `
-You are a B2B SaaS adoption analyst. You receive per-team facts derived from an org CSV (status, connections, budget holders). Your job is to turn facts into concise executive signals.
-
-Company: ${company}
-
-Teams JSON (ground truth — do not invent people or numbers not implied here):
-${JSON.stringify(teams, null, 2)}
-
-Return ONLY valid JSON (no markdown fences, no commentary) with this exact shape:
-{
-  "teams": [
-    {
-      "team": "<must exactly match a team string from the input>",
-      "card_title": "<short title, e.g. Champion pocket / Adoption risk / Momentum team>",
-      "health_tier": "<one of: strong | medium | risk | watchlist>",
-      "subtitle": "<one line: reference coverage % and a concrete fact from the data>",
-      "green_flags": ["<2-4 short bullets: real strengths tied to the metrics>"],
-      "red_flags": ["<2-4 short bullets: credible risks tied to the metrics>"],
-      "action_label": "<imperative next step a CSM could take this week, <= 8 words>"
-    }
-  ]
-}
-
-Rules:
-- Emit one object per team in the input, same teams, no extras.
-- Write flags as sharp, specific observations; avoid generic platitudes.
-- If red_flags would be empty, still include 1 mild watch-item grounded in the data.
-- health_tier must reflect adoption_ratio_among_relevant and engagement patterns: strong (~>=70 and healthy engagement), medium (~40-69 or mixed), risk (<40 or multiple inactive budget holders), watchlist (tiny team or mostly Not Relevant skew—explain in subtitle).
-- action_label must logically follow the red_flags / green_flags balance.
-`.trim();
-}
-
-function extractJsonObject(text) {
-  const trimmed = String(text || "").trim();
-  const fenceMatch = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/i);
-  const candidate = fenceMatch ? fenceMatch[1].trim() : trimmed;
-  const start = candidate.indexOf("{");
-  const end = candidate.lastIndexOf("}");
-
-  if (start === -1 || end === -1 || end <= start) {
-    throw new Error("Model response did not contain a JSON object.");
-  }
-
-  return JSON.parse(candidate.slice(start, end + 1));
-}
-
-function normalizeTeamFlagsPayload(payload, expectedTeams) {
-  const teams = Array.isArray(payload?.teams) ? payload.teams : [];
-  const byName = new Map(teams.map((entry) => [String(entry.team || "").trim(), entry]));
-
-  return expectedTeams.map((teamName) => {
-    const match = byName.get(teamName) || byName.get(teamName.trim());
-
-    if (!match) {
-      return {
-        team: teamName,
-        card_title: teamName,
-        health_tier: "watchlist",
-        subtitle: "No AI row matched this team name.",
-        green_flags: [],
-        red_flags: ["Regenerate insights — the model omitted structured data for this team."],
-        action_label: "Regenerate team insights",
-      };
-    }
-
-    const tier = ["strong", "medium", "risk", "watchlist"].includes(match.health_tier)
-      ? match.health_tier
-      : "medium";
-
-    return {
-      team: teamName,
-      card_title: String(match.card_title || teamName).trim(),
-      health_tier: tier,
-      subtitle: String(match.subtitle || "").trim(),
-      green_flags: (Array.isArray(match.green_flags) ? match.green_flags : [])
-        .map((item) => String(item || "").trim())
-        .filter(Boolean)
-        .slice(0, 5),
-      red_flags: (Array.isArray(match.red_flags) ? match.red_flags : [])
-        .map((item) => String(item || "").trim())
-        .filter(Boolean)
-        .slice(0, 5),
-      action_label: String(match.action_label || "Follow up with team sponsor").trim(),
-    };
-  });
-}
-
 async function generateTeamFlags(company, records, signal) {
   const structure = buildDepartmentGroups(records);
 
@@ -838,40 +745,23 @@ async function generateTeamFlags(company, records, signal) {
     throw new Error("No teams found under leadership in this dataset.");
   }
 
-  const response = await fetch("/api/anthropic/v1/messages", {
+  const teams = buildTeamMetricsPayload(company, records);
+  const response = await fetch("/api/team-flags", {
     method: "POST",
     signal,
-    headers: {
-      "content-type": "application/json",
-      "x-api-key": ANTHROPIC_API_KEY,
-      "anthropic-version": "2023-06-01",
-      "anthropic-dangerous-direct-browser-access": "true",
-    },
-    body: JSON.stringify({
-      model: ANTHROPIC_MODEL,
-      max_tokens: 2600,
-      temperature: 0.25,
-      messages: [
-        {
-          role: "user",
-          content: buildTeamFlagsPrompt(company, records),
-        },
-      ],
-    }),
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ company, teams }),
   });
 
   if (!response.ok) {
-    const errorPayload = await response.json().catch(() => null);
-    const apiMessage = errorPayload?.error?.message || `Anthropic API error ${response.status}`;
-    throw new Error(apiMessage);
+    const err = await response.json().catch(() => null);
+    const rawMessage = err?.message;
+    const message = Array.isArray(rawMessage) ? rawMessage.join(", ") : rawMessage;
+    throw new Error(message || `Backend error ${response.status}`);
   }
 
-  const payload = await response.json();
-  const text = payload.content?.map((item) => item.text).join("\n").trim() || "";
-  const parsed = extractJsonObject(text);
-  const expectedTeams = structure.departments.map((dept) => dept.team);
-
-  return normalizeTeamFlagsPayload(parsed, expectedTeams);
+  const data = await response.json();
+  return data.teams;
 }
 
 const TEAM_TIER_LABELS = {
@@ -902,23 +792,15 @@ function TeamHealthPanel({
             Claude reads the same adoption metrics as the org chart and returns actionable signals per department.
           </p>
         </div>
-        {ANTHROPIC_API_KEY ? (
-          <button
-            type="button"
-            className="action-button"
-            onClick={onGenerate}
-            disabled={isLoading || !hasTeams}
-          >
-            {isLoading ? "Generating..." : teams?.length ? "Regenerate" : "Generate team insights"}
-          </button>
-        ) : null}
+        <button
+          type="button"
+          className="action-button"
+          onClick={onGenerate}
+          disabled={isLoading || !hasTeams}
+        >
+          {isLoading ? "Generating..." : teams?.length ? "Regenerate" : "Generate team insights"}
+        </button>
       </div>
-
-      {!ANTHROPIC_API_KEY ? (
-        <p className="summary-placeholder">
-          Add `VITE_ANTHROPIC_API_KEY=your_key_here` to `.env`, then restart `npm run dev`.
-        </p>
-      ) : null}
 
       {!hasTeams ? (
         <p className="summary-placeholder">
@@ -926,13 +808,13 @@ function TeamHealthPanel({
         </p>
       ) : null}
 
-      {ANTHROPIC_API_KEY && isLoading ? (
+      {isLoading ? (
         <p className="summary-placeholder">Mapping adoption patterns to green flags, red flags, and next actions.</p>
       ) : null}
 
-      {ANTHROPIC_API_KEY && error ? <p className="error-message">{error}</p> : null}
+      {error ? <p className="error-message">{error}</p> : null}
 
-      {ANTHROPIC_API_KEY && !isLoading && !error && teams?.length ? (
+      {!isLoading && !error && teams?.length ? (
         <div className="team-flags__grid">
           {teams.map((team) => (
             <article key={team.team} className="team-flag-card">
@@ -992,7 +874,7 @@ function TeamHealthPanel({
         </div>
       ) : null}
 
-      {ANTHROPIC_API_KEY && hasTeams && !isLoading && !error && !teams?.length ? (
+      {hasTeams && !isLoading && !error && !teams?.length ? (
         <p className="summary-placeholder">
           Click <strong>Generate team insights</strong> to produce green flags, red flags, and a suggested action for
           each team in <strong>{company}</strong>.
@@ -1176,7 +1058,7 @@ export default function App() {
   }, [selectedCompany, records]);
 
   useEffect(() => {
-    if (!teamFlagsNonce || !ANTHROPIC_API_KEY || !selectedCompany || !companyRecords.length) {
+    if (!teamFlagsNonce || !selectedCompany || !companyRecords.length) {
       return;
     }
 

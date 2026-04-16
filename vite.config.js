@@ -5,10 +5,9 @@ export default defineConfig({
   plugins: [react()],
   server: {
     proxy: {
-      "/api/anthropic": {
-        target: "https://api.anthropic.com",
+      "/api": {
+        target: "http://localhost:3000",
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api\/anthropic/, ""),
       },
     },
   },
