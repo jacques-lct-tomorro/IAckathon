@@ -1,38 +1,85 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { JwtService } from '@nestjs/jwt';
+import { OAuth2Client } from 'google-auth-library';
+
+export type AuthUser = {
+  sub: string;
+  email: string;
+  name: string;
+  picture?: string;
+};
 
 @Injectable()
 export class AuthService {
-  constructor(private readonly configService: ConfigService) {}
+  private readonly googleClient: OAuth2Client;
+  private readonly googleClientId: string;
 
-  validateLogin(username: string, password: string): string {
-    const rawUsers = this.configService.get<string>('AUTH_USERS') ?? '';
-    const allowedUsers = rawUsers
-      .split(',')
-      .map((u) => u.trim())
-      .filter(Boolean);
+  constructor(
+    private readonly configService: ConfigService,
+    private readonly jwtService: JwtService,
+  ) {
+    this.googleClientId =
+      this.configService.get<string>('GOOGLE_CLIENT_ID') ?? '';
+    this.googleClient = new OAuth2Client(this.googleClientId);
+  }
 
-    const expectedPassword = this.configService.get<string>('AUTH_PASSWORD') ?? '';
-
-    if (!allowedUsers.length || !expectedPassword) {
-      throw new UnauthorizedException('Authentication is not configured.');
+  async verifyGoogleIdToken(idToken: string): Promise<AuthUser> {
+    const normalizedToken = String(idToken ?? '').trim();
+    if (!normalizedToken) {
+      throw new UnauthorizedException('Google credential is missing.');
     }
 
-    const normalizedUser = String(username ?? '').trim();
-    const normalizedPassword = String(password ?? '');
-
-    if (!normalizedUser || !normalizedPassword) {
-      throw new UnauthorizedException('Invalid username or password.');
+    if (!this.googleClientId) {
+      throw new UnauthorizedException(
+        'Google authentication is not configured.',
+      );
     }
 
-    const matchedUser = allowedUsers.find(
-      (u) => u.toLowerCase() === normalizedUser.toLowerCase(),
-    );
-
-    if (!matchedUser || normalizedPassword !== expectedPassword) {
-      throw new UnauthorizedException('Invalid username or password.');
+    let payload:
+      | {
+          sub?: string;
+          email?: string;
+          name?: string;
+          picture?: string;
+          email_verified?: boolean;
+        }
+      | undefined;
+    try {
+      const ticket = await this.googleClient.verifyIdToken({
+        idToken: normalizedToken,
+        audience: this.googleClientId,
+      });
+      payload = ticket.getPayload();
+    } catch {
+      throw new UnauthorizedException('Google credential is invalid.');
     }
 
-    return matchedUser;
+    if (!payload?.sub || !payload.email || !payload.name) {
+      throw new UnauthorizedException('Google account payload is invalid.');
+    }
+
+    if (payload.email_verified === false) {
+      throw new UnauthorizedException('Google email is not verified.');
+    }
+
+    return {
+      sub: payload.sub,
+      email: payload.email,
+      name: payload.name,
+      picture: payload.picture ?? undefined,
+    };
+  }
+
+  signSessionToken(user: AuthUser): string {
+    return this.jwtService.sign(user);
+  }
+
+  verifySessionToken(token: string): AuthUser {
+    try {
+      return this.jwtService.verify<AuthUser>(token);
+    } catch {
+      throw new UnauthorizedException('Session is invalid or expired.');
+    }
   }
 }

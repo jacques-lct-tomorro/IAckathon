@@ -9,7 +9,7 @@ import { TeamHealthPanel } from "./components/TeamHealthPanel.jsx";
 import { OroScopeLogo } from "./components/OroScopeLogo.jsx";
 import { generateTeamFlags } from "./utils/api.js";
 import { parseCsv } from "./utils/csv.js";
-import { initialsFromUsername } from "./utils/helpers.js";
+import { initialsFromName } from "./utils/helpers.js";
 
 export default function App() {
   const [user, setUser] = useState(null);
@@ -36,7 +36,7 @@ export default function App() {
 
         if (response.ok) {
           const data = await response.json();
-          setUser({ username: data.username });
+          setUser(data.user);
         } else {
           setUser(null);
         }
@@ -183,11 +183,21 @@ export default function App() {
         <div className="hero__actions">
           <div className="user-session" role="status">
             <div className="user-session__avatar" aria-hidden="true">
-              {initialsFromUsername(user.username)}
+              {user.picture ? (
+                <img
+                  src={user.picture}
+                  alt=""
+                  className="user-session__avatar-image"
+                  referrerPolicy="no-referrer"
+                />
+              ) : (
+                initialsFromName(user.name || user.email)
+              )}
             </div>
             <div className="user-session__meta">
               <span className="user-session__label">Signed in</span>
-              <span className="user-session__name">{user.username}</span>
+              <span className="user-session__name">{user.name || user.email}</span>
+              <span className="user-session__email">{user.email}</span>
             </div>
             <span
               className="user-session__pulse"

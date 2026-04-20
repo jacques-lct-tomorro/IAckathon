@@ -274,6 +274,13 @@ input {
   flex-shrink: 0;
 }
 
+.user-session__avatar-image {
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  object-fit: cover;
+}
+
 .user-session__meta {
   display: flex;
   flex-direction: column;
@@ -294,6 +301,14 @@ input {
   font-size: 0.95rem;
   font-weight: 700;
   color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.user-session__email {
+  font-size: 0.74rem;
+  color: var(--text-muted);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -503,6 +518,10 @@ input {
   gap: 16px;
 }
 
+.auth-google-button {
+  min-height: 42px;
+}
+
 .field--auth {
   max-width: none;
 }
@@ -526,6 +545,12 @@ input {
 
 .auth-panel__actions {
   margin-top: 4px;
+}
+
+.auth-panel__hint {
+  margin: 0;
+  font-size: 0.84rem;
+  color: var(--text-muted);
 }
 
 .action-button--auth-submit {

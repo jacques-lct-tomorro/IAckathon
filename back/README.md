@@ -44,6 +44,26 @@ $ npm run start:dev
 $ npm run start:prod
 ```
 
+## Authentication configuration
+
+This backend now uses Google Sign-In + a stateless JWT cookie (no database/session store).
+
+Required backend environment variables:
+
+- `GOOGLE_CLIENT_ID`: OAuth client ID from Google Cloud.
+- `JWT_SECRET`: secret used to sign the app session JWT.
+
+Optional backend environment variables:
+
+- `JWT_EXPIRES_IN`: JWT expiry string (default: `7d`).
+- `SESSION_COOKIE_SAMESITE`: cookie sameSite (`lax`, `strict`, `none`; default: `lax`).
+- `SESSION_COOKIE_SECURE`: cookie secure override (`true`/`1` to force secure).
+- `AUTH_COOKIE_MAX_AGE_MS`: cookie max age in milliseconds (default: 7 days).
+
+Frontend environment variable:
+
+- `VITE_GOOGLE_CLIENT_ID`: same Google client ID exposed to the browser.
+
 ## Run tests
 
 ```bash

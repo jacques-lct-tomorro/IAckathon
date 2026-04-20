@@ -1,48 +1,95 @@
-import { useMemo, useState } from "react";
-import { API_BASE } from "../constants.js";
-import { initialsFromUsername } from "../utils/helpers.js";
+import { useEffect, useRef, useState } from "react";
+import { API_BASE, GOOGLE_CLIENT_ID } from "../constants.js";
 
 export function LoginForm({ onSuccess }) {
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const previewInitials = useMemo(
-    () => initialsFromUsername(username),
-    [username],
-  );
+  const buttonRef = useRef(null);
+  const initializedRef = useRef(false);
 
-  const handleSubmit = async (event) => {
-    event.preventDefault();
-    setError("");
-    setSubmitting(true);
+  useEffect(() => {
+    let cancelled = false;
 
-    try {
-      const response = await fetch(`${API_BASE}/api/auth/login`, {
-        method: "POST",
-        credentials: "include",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ username, password }),
-      });
+    if (!GOOGLE_CLIENT_ID) {
+      setError("Google sign-in is not configured.");
+      return;
+    }
 
-      if (!response.ok) {
-        const body = await response.json().catch(() => null);
-        const rawMessage = body?.message;
-        const message = Array.isArray(rawMessage)
-          ? rawMessage.join(", ")
-          : rawMessage;
-        setError(message || "Sign in failed.");
-        return;
+    const setupGoogleButton = () => {
+      if (cancelled || initializedRef.current) {
+        return true;
+      }
+      if (!window.google?.accounts?.id || !buttonRef.current) {
+        return false;
       }
 
-      const data = await response.json();
-      onSuccess({ username: data.username });
-    } catch (submitError) {
-      setError(submitError.message || "Unable to reach the server.");
-    } finally {
-      setSubmitting(false);
+      window.google.accounts.id.initialize({
+        client_id: GOOGLE_CLIENT_ID,
+        callback: async (response) => {
+          if (!response.credential || cancelled) {
+            return;
+          }
+
+          setError("");
+          setSubmitting(true);
+          try {
+            const backendResponse = await fetch(`${API_BASE}/api/auth/google`, {
+              method: "POST",
+              credentials: "include",
+              headers: { "content-type": "application/json" },
+              body: JSON.stringify({ credential: response.credential }),
+            });
+
+            if (!backendResponse.ok) {
+              const body = await backendResponse.json().catch(() => null);
+              const rawMessage = body?.message;
+              const message = Array.isArray(rawMessage)
+                ? rawMessage.join(", ")
+                : rawMessage;
+              setError(message || "Google sign in failed.");
+              return;
+            }
+
+            const data = await backendResponse.json();
+            onSuccess(data.user);
+          } catch (submitError) {
+            setError(submitError.message || "Unable to reach the server.");
+          } finally {
+            if (!cancelled) {
+              setSubmitting(false);
+            }
+          }
+        },
+      });
+
+      buttonRef.current.innerHTML = "";
+      window.google.accounts.id.renderButton(buttonRef.current, {
+        theme: "outline",
+        size: "large",
+        text: "continue_with",
+        width: 320,
+      });
+      initializedRef.current = true;
+      return true;
+    };
+
+    if (setupGoogleButton()) {
+      return () => {
+        cancelled = true;
+      };
     }
-  };
+
+    const intervalId = window.setInterval(() => {
+      if (setupGoogleButton()) {
+        window.clearInterval(intervalId);
+      }
+    }, 250);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+    };
+  }, [onSuccess]);
 
   return (
     <main className="app-shell app-shell--auth">
@@ -67,72 +114,31 @@ export function LoginForm({ onSuccess }) {
               <p className="eyebrow eyebrow--auth-brand">Sign in</p>
               <h1 className="auth-panel__title">Welcome back</h1>
               <p className="auth-panel__lede">
-                Use your assigned name and the shared access password to open
-                the workspace.
+                Use your company Google account to access the workspace.
               </p>
-            </div>
-            <div className="auth-panel__avatar-wrap">
-              <div
-                className="auth-avatar"
-                title="How you will appear in the app"
-              >
-                <span className="auth-avatar__ring" />
-                <span className="auth-avatar__initials">{previewInitials}</span>
-              </div>
-              <span className="auth-panel__avatar-caption">Preview</span>
             </div>
           </header>
 
-          <form className="auth-panel__form" onSubmit={handleSubmit}>
-            <label className="field field--auth">
-              <span>Username</span>
-              <input
-                type="text"
-                name="username"
-                autoComplete="username"
-                value={username}
-                onChange={(event) => setUsername(event.target.value)}
-                placeholder="e.g. alice"
-                required
-              />
-            </label>
-            <label className="field field--auth">
-              <span>Password</span>
-              <input
-                name="password"
-                type="password"
-                autoComplete="current-password"
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                placeholder="Shared team password"
-                required
-              />
-            </label>
+          <section className="auth-panel__form" aria-label="Google sign in">
+            <div
+              ref={buttonRef}
+              className="auth-google-button"
+              aria-live="polite"
+              aria-busy={submitting}
+            />
             {error ? (
               <div className="auth-panel__error" role="alert">
                 <p className="error-message error-message--auth">{error}</p>
               </div>
             ) : null}
             <div className="auth-panel__actions">
-              <button
-                type="submit"
-                className="action-button action-button--auth-submit"
-                disabled={submitting}
-              >
-                {submitting ? (
-                  <>
-                    <span
-                      className="action-button__spinner"
-                      aria-hidden="true"
-                    />
-                    Signing in…
-                  </>
-                ) : (
-                  "Enter workspace"
-                )}
-              </button>
+              <p className="auth-panel__hint" aria-live="polite">
+                {submitting
+                  ? "Signing in with Google..."
+                  : "Use the Google button above to continue."}
+              </p>
             </div>
-          </form>
+          </section>
         </section>
       </div>
     </main>

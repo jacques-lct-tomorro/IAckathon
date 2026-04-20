@@ -1,10 +1,11 @@
-export function initialsFromUsername(value) {
+export function initialsFromName(value) {
   const trimmed = String(value || "").trim();
   if (!trimmed) {
     return "—";
   }
 
-  const parts = trimmed.split(/\s+/).filter(Boolean);
+  const source = trimmed.includes("@") ? trimmed.split("@")[0] : trimmed;
+  const parts = source.split(/\s+/).filter(Boolean);
 
   if (parts.length >= 2) {
     const first = parts[0][0] || "";
